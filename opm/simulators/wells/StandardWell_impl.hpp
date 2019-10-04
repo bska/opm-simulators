@@ -1271,12 +1271,14 @@ namespace Opm
 
         well_state.bhp()[index_of_well_] = primary_variables_[Bhp];
 
-        // calculate the phase rates based on the primary variables
-        // for producers, this is not a problem, while not sure for injectors here
+        // Calculate the phase rates based on the primary variables.  This
+        // is not a problem for producers, but we are not sure about the
+        // validity for the injector case here.
         if (this->isProducer()) {
             const double g_total = primary_variables_[WQTotal];
+            auto* qw = &well_state.wellRates()[index_of_well_*number_of_phases_ + 0];
             for (int p = 0; p < number_of_phases_; ++p) {
-                well_state.wellRates()[index_of_well_ * number_of_phases_ + p] = g_total * F[p];
+                qw[p] = g_total * F[p];
             }
         } else { // injectors
             for (int p = 0; p < number_of_phases_; ++p) {
@@ -1569,13 +1571,14 @@ namespace Opm
             case Well::ProducerCMode::CMODE_UNDEFINED:
             {
                 OPM_DEFLOG_THROW(std::runtime_error, "Well control must be specified for well "  + name(), deferred_logger );
+                break;
             }
             case Well::ProducerCMode::NONE:
             {
                 OPM_DEFLOG_THROW(std::runtime_error, "Well control must be specified for well "  + name() , deferred_logger);
+                break;
             }
 
-                break;
             } // end of switch
         }
     }
@@ -2897,12 +2900,19 @@ namespace Opm
         const int well_index = index_of_well_;
         const int np = number_of_phases_;
         const auto& pu = phaseUsage();
+        const auto* qw = &well_state.wellRates()[well_index*np + 0];
 
         // the weighted total well rate
-        double total_well_rate = 0.0;
-        for (int p = 0; p < np; ++p) {
-            total_well_rate += scalingFactor(p) * well_state.wellRates()[np * well_index + p];
-        }
+        const auto total_well_rate = [this, np, qw]() -> double
+        {
+            double qtot = 0.0;
+
+            for (int p = 0; p < np; ++p) {
+                qtot += this->scalingFactor(p) * qw[p];
+            }
+
+            return qtot;
+        }();
 
         // Not: for the moment, the first primary variable for the injectors is not G_total. The injection rate
         // under surface condition is used here

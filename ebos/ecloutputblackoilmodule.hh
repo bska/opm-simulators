@@ -923,50 +923,57 @@ public:
     void addRftDataToWells(Opm::data::Wells& wellDatas, size_t reportStepNum)
     {
         const auto& schedule = simulator_.vanguard().schedule();
-        const auto& rft_config = schedule[reportStepNum].rft_config();
-        for (const auto& well: schedule.getWells(reportStepNum)) {
 
+        if (! schedule[reportStepNum].rft_config().active(reportStepNum))
+            return;
+
+        const auto& gdims = this->simulator_.vanguard().eclState().gridDims();
+
+        for (const auto& wname: schedule.wellNames(reportStepNum)) {
             // don't bother with wells not on this process
-            if (isDefunctParallelWell(well.name())) {
+            if (isDefunctParallelWell(wname)) {
                 continue;
             }
 
             //add data infrastructure for shut wells
-            if (!wellDatas.count(well.name())) {
-                Opm::data::Well wellData;
+            if (! wellDatas.count(wname)) {
+                const auto& wcon = schedule.getWell(wname, reportStepNum)
+                    .getConnections();
 
-                if (!rft_config.active())
-                    continue;
+                auto& xw = wellDatas[wname];
 
-                wellData.connections.resize(well.getConnections().size());
-                size_t count = 0;
-                for (const auto& connection: well.getConnections()) {
+                xw.connections.resize(wcon.size());
+                auto count = decltype(wcon.size()){0};
+                for (const auto& connection: wcon) {
                     const size_t i = size_t(connection.getI());
                     const size_t j = size_t(connection.getJ());
                     const size_t k = size_t(connection.getK());
 
-                    const size_t index = simulator_.vanguard().eclState().gridDims().getGlobalIndex(i, j, k);
-                    auto& connectionData = wellData.connections[count];
-                    connectionData.index = index;
-                    count++;
+                    xw.connections[count++].index = gdims.getGlobalIndex(i, j, k);
                 }
-                wellDatas.emplace(std::make_pair(well.name(), wellData));
             }
 
-            Opm::data::Well& wellData = wellDatas.at(well.name());
-            for (auto& connectionData: wellData.connections) {
+            for (auto& connectionData: wellDatas.at(wname).connections) {
                 const auto index = connectionData.index;
-                if (oilConnectionPressures_.count(index) > 0)
-                    connectionData.cell_pressure = oilConnectionPressures_.at(index);
-                if (waterConnectionSaturations_.count(index) > 0)
-                    connectionData.cell_saturation_water = waterConnectionSaturations_.at(index);
-                if (gasConnectionSaturations_.count(index) > 0)
-                    connectionData.cell_saturation_gas = gasConnectionSaturations_.at(index);
+
+                auto opress = this->oilConnectionPressures_.find(index);
+                auto sw = this->waterConnectionSaturations_.find(index);
+                auto sg = this->gasConnectionSaturations_.find(index);
+
+                if (opress != this->oilConnectionPressures_.end())
+                    connectionData.cell_pressure = opress->second;
+
+                if (sw != this->waterConnectionSaturations_.end())
+                    connectionData.cell_saturation_water = sw->second;
+
+                if (sg != this->gasConnectionSaturations_.end())
+                    connectionData.cell_saturation_gas = sg->second;
             }
         }
-        oilConnectionPressures_.clear();
-        waterConnectionSaturations_.clear();
-        gasConnectionSaturations_.clear();
+
+        this->oilConnectionPressures_.clear();
+        this->waterConnectionSaturations_.clear();
+        this->gasConnectionSaturations_.clear();
     }
 
     /*!

@@ -192,31 +192,46 @@ public:
         : simulator_(simulator)
         , collectToIORank_(simulator_.vanguard())
     {
-        std::vector<std::size_t> wbp_index_list;
-        if (collectToIORank_.isIORank()) {
-            const auto& schedule = simulator_.vanguard().schedule();
-            eclIO_.reset(new Opm::EclipseIO(simulator_.vanguard().eclState(),
-                                            Opm::UgGridHelpers::createEclipseGrid(globalGrid(), simulator_.vanguard().eclState().getInputGrid()),
-                                            schedule,
-                                            simulator_.vanguard().summaryConfig()));
+        using Opm::UgGridHelpers::createEclipseGrid;
 
-            const auto& wbp_calculators = eclIO_->summary().wbp_calculators( schedule.size() - 1 );
+        std::vector<std::size_t> wbp_index_list;
+
+        if (this->collectToIORank_.isIORank()) {
+            const auto& vg = this->simulator_.vanguard();
+            const auto& es = vg.eclState();
+
+            this->eclIO_.reset(new Opm::EclipseIO {
+                es, createEclipseGrid(globalGrid(), es.getInputGrid()),
+                vg.schedule(), vg.summaryConfig()
+            });
+
+            const auto& wbp_calculators = this->eclIO_->summary()
+                .wbp_calculators(vg.schedule.size() - 1);
+
             wbp_index_list = wbp_calculators.index_list();
         }
+
         if (collectToIORank_.isParallel()) {
             const auto& comm = simulator_.vanguard().grid().comm();
             unsigned long size = wbp_index_list.size();
+
             comm.broadcast(&size, 1, collectToIORank_.ioRank);
-            if (!collectToIORank_.isIORank())
+            if (!collectToIORank_.isIORank()) {
                 wbp_index_list.resize( size );
+            }
+
             comm.broadcast(wbp_index_list.data(), size, collectToIORank_.ioRank);
         }
+
         // create output thread if enabled and rank is I/O rank
         // async output is enabled by default if pthread are enabled
-        bool enableAsyncOutput = EWOMS_GET_PARAM(TypeTag, bool, EnableAsyncEclOutput);
         int numWorkerThreads = 0;
-        if (enableAsyncOutput && collectToIORank_.isIORank())
+        if (EWOMS_GET_PARAM(TypeTag, bool, EnableAsyncEclOutput)
+            && this->collectToIORank_.isIORank())
+        {
             numWorkerThreads = 1;
+        }
+
         taskletRunner_.reset(new TaskletRunner(numWorkerThreads));
 
         this->eclOutputModule_ = std::make_unique<EclOutputBlackOilModule<TypeTag>>(simulator, wbp_index_list, this->collectToIORank_);
@@ -715,7 +730,7 @@ private:
             , reportStepNum_(reportStepNum)
             , isSubStep_(isSubStep)
             , secondsElapsed_(secondsElapsed)
-            , restartValue_(restartValue)
+            , restartValue_(std::move(restartValue))
             , writeDoublePrecision_(writeDoublePrecision)
         { }
 
@@ -805,11 +820,16 @@ private:
 
         // first, create a tasklet to write the data for the current time
         // step to disk
-        auto eclWriteTasklet = std::make_shared<EclWriteTasklet>(
-            this->actionState(), this->summaryState(), this->udqState(), *this->eclIO_,
-            reportStepNum, isSubStep, curTime, std::move(restartValue),
-            EWOMS_GET_PARAM(TypeTag, bool, EclOutputDoublePrecision)
-            );
+        auto eclWriteTasklet = std::make_shared<EclWriteTasklet>
+            (this->actionState(),
+             this->summaryState(),
+             this->udqState(),
+             *this->eclIO_,
+             reportStepNum,
+             isSubStep,
+             curTime,
+             std::move(restartValue),
+             EWOMS_GET_PARAM(TypeTag, bool, EclOutputDoublePrecision));
 
         // then, make sure that the previous I/O request has been completed
         // and the number of incomplete tasklets does not increase between
