@@ -61,9 +61,6 @@ namespace Opm {
 
         const auto numProcs = ebosSimulator.gridView().comm().size();
         this->not_on_process_ = [this, numProcs](const Well& well) {
-            if (well.getStatus() == Well::Status::SHUT)
-                return true;
-
             if (numProcs == decltype(numProcs){1})
                 return false;
 
@@ -912,6 +909,30 @@ namespace Opm {
 
 
     template <typename TypeTag>
+    void BlackoilWellModel<TypeTag>::
+    inferLocalShutWells()
+    {
+        this->local_shut_wells_.clear();
+
+        const auto nw = this->numLocalWells();
+
+        auto used = std::vector<bool>(nw, false);
+        for (const auto& wellPtr : this->well_container_) {
+            used[wellPtr->indexOfWell()] = true;
+        }
+
+        for (auto wellID = 0; wellID < nw; ++wellID) {
+            if (! used[wellID]) {
+                this->local_shut_wells_.push_back(wellID);
+            }
+        }
+    }
+
+
+
+
+
+    template <typename TypeTag>
     typename BlackoilWellModel<TypeTag>::WellInterfacePtr
     BlackoilWellModel<TypeTag>::
     createWellPointer(const int wellID, const int time_step) const
@@ -1520,22 +1541,60 @@ namespace Opm {
 
 
 
-
-    template<typename TypeTag>
+    template <typename TypeTag>
     void
     BlackoilWellModel<TypeTag>::
     calculateProductivityIndexValues(DeferredLogger& deferred_logger)
     {
-        if (! this->localWellsActive()) {
-            return;
-        }
-
         for (const auto& wellPtr : this->well_container_) {
-            wellPtr->updateProductivityIndex(this->ebosSimulator_,
-                                             this->prod_index_calc_[wellPtr->indexOfWell()],
-                                             this->well_state_,
-                                             deferred_logger);
+            this->calculateProductivityIndexValues(wellPtr.get(), deferred_logger);
         }
+    }
+
+
+
+
+
+    template <typename TypeTag>
+    void
+    BlackoilWellModel<TypeTag>::
+    calculateProductivityIndexValuesShutWells(const int reportStepIdx,
+                                              DeferredLogger& deferred_logger)
+    {
+        // For the purpose of computing PI/II values, it is sufficient to
+        // construct StandardWell instances only.  We don't need to form
+        // well objects that honour the 'isMultisegment()' flag of the
+        // corresponding "this->wells_ecl_[shutWell]".
+        //
+        // Moreover, we don't need to solve any non-linear equations to
+        // compute the PI so passing a trivial B_avg is sufficient here.
+        const auto B_avg = std::vector<Scalar>(numComponents(), Scalar());
+
+        for (const auto& shutWell : this->local_shut_wells_) {
+            auto wellPtr = this->template createTypedWellPointer
+                <StandardWell<TypeTag>>(shutWell, reportStepIdx);
+
+            wellPtr->init(&this->phase_usage_, this->depth_,
+                          this->gravity_, this->local_num_cells_, B_avg);
+
+            this->calculateProductivityIndexValues(wellPtr.get(), deferred_logger);
+        }
+    }
+
+
+
+
+
+    template <typename TypeTag>
+    void
+    BlackoilWellModel<TypeTag>::
+    calculateProductivityIndexValues(const WellInterface<TypeTag>* wellPtr,
+                                     DeferredLogger& deferred_logger)
+    {
+        wellPtr->updateProductivityIndex(this->ebosSimulator_,
+                                         this->prod_index_calc_[wellPtr->indexOfWell()],
+                                         this->well_state_,
+                                         deferred_logger);
     }
 
 
@@ -2772,20 +2831,21 @@ namespace Opm {
             auto saved_previous_well_state = this->previous_well_state_;
             this->previous_well_state_ = this->well_state_;
 
-            well_container_ = createWellContainer(timeStepIdx);
-            std::vector< Scalar > B_avg(numComponents(), Scalar() );
-            // we don't plan to iterate so just passing trivial B_avg
-            // for now
-            for (auto& well : well_container_) {
-                well->init(&phase_usage_, depth_, gravity_, local_num_cells_, B_avg);
-            }
+            this->well_container_ = this->createWellContainer(timeStepIdx);
+            this->inferLocalShutWells();
 
-            std::fill(is_cell_perforated_.begin(), is_cell_perforated_.end(), false);
-            for (auto& well : well_container_) {
-                well->updatePerforatedCell(is_cell_perforated_);
+            // We don't need to solve any non-linear equations to compute
+            // the PI so passing a trivial B_avg is sufficient here.
+            const auto B_avg = std::vector<Scalar>(numComponents(), Scalar());
+
+            for (auto& wellPtr : this->well_container_) {
+                wellPtr->init(&this->phase_usage_, this->depth_,
+                              this->gravity_, this->local_num_cells_, B_avg);
             }
 
             this->calculateProductivityIndexValues(local_deferredLogger);
+            this->calculateProductivityIndexValuesShutWells(timeStepIdx, local_deferredLogger);
+
             this->previous_well_state_ = std::move(saved_previous_well_state);
         }
 

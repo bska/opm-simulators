@@ -284,6 +284,7 @@ namespace Opm {
             std::vector< Well > wells_ecl_{};
             std::vector< std::vector<PerforationData> > well_perf_data_{};
             std::vector< WellProdIndexCalculator > prod_index_calc_{};
+            std::vector<int> local_shut_wells_{};
 
             std::vector< ParallelWellInfo > parallel_well_info_;
             std::vector< ParallelWellInfo* > local_parallel_well_info_;
@@ -310,6 +311,8 @@ namespace Opm {
 
             // create the well container
             std::vector<WellInterfacePtr > createWellContainer(const int time_step);
+
+            void inferLocalShutWells();
 
             WellInterfacePtr
             createWellPointer(const int wellID,
@@ -417,7 +420,10 @@ namespace Opm {
 
             void calculateEfficiencyFactors(const int reportStepIdx);
 
+            void calculateProductivityIndexValuesShutWells(const int reportStepIdx, DeferredLogger& deferred_logger);
             void calculateProductivityIndexValues(DeferredLogger& deferred_logger);
+            void calculateProductivityIndexValues(const WellInterface<TypeTag>* wellPtr,
+                                                  DeferredLogger& deferred_logger);
 
             // it should be able to go to prepareTimeStep(), however, the updateWellControls() and initPrimaryVariablesEvaluation()
             // makes it a little more difficult. unless we introduce if (iterationIdx != 0) to avoid doing the above functions
