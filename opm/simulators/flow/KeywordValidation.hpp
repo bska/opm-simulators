@@ -43,7 +43,9 @@ class DeckKeyword;
 class ErrorGuard;
 class ParseContext;
 
-namespace KeywordValidation
+} // namespace Opm
+
+namespace Opm { namespace KeywordValidation
 {
     // Describe an unsupported keyword:
     struct UnsupportedKeywordProperties {
@@ -60,15 +62,19 @@ namespace KeywordValidation
     };
 
     // This is used to list unsupported kewyords.
-    using UnsupportedKeywords = std::map<std::string, UnsupportedKeywordProperties>;
+    using UnsupportedKeywords =
+        std::map<std::string, UnsupportedKeywordProperties>;
 
     // This is used to list the partially supported items of a keyword:
     template <typename T>
-    using SupportedSingleKeywordItems = std::map<std::size_t, SupportedKeywordProperties<T>>;
+    using SupportedSingleKeywordItems =
+        std::map<std::size_t, SupportedKeywordProperties<T>>;
 
-    // This is used to list the keywords that have partially supported items or items that benefit from early validation:
+    // This is used to list the keywords that have partially supported items
+    // or items that benefit from early validation:
     template <typename T>
-    using SupportedKeywordItems = std::map<std::string, SupportedSingleKeywordItems<T>>;
+    using SupportedKeywordItems =
+        std::map<std::string, SupportedSingleKeywordItems<T>>;
 
     // This contains the information needed to report a single error occurence.
     // The validator will construct a vector of these, copying the relevant
@@ -99,16 +105,17 @@ struct SupportedKeywords {
     class KeywordValidator
     {
     public:
+        using ValidatorMap = std::unordered_map<std::string, ValidationFunction>;
+
         KeywordValidator(const UnsupportedKeywords& unsupported_keywords,
                          const SupportedKeywords& partially_supported_keywords,
                          const SupportedKeywords& fully_supported_keywords,
-                         const std::unordered_map<std::string, ValidationFunction>& special_validation)
+                         const ValidatorMap& special_validation)
             : m_unsupported_keywords(unsupported_keywords)
             , m_partially_supported_keywords(partially_supported_keywords)
             , m_fully_supported_keywords(fully_supported_keywords)
             , m_special_validation(special_validation)
-        {
-        }
+        {}
 
         // Validate a deck, reporting warnings and errors. If there are only
         // warnings, these will be reported. If there are errors, these are
@@ -138,15 +145,10 @@ struct SupportedKeywords {
                                   const SupportedKeywords& keyword_items,
                                   std::vector<ValidationError>& errors) const;
 
-        template <typename T>
-        void validateKeywordItems(const DeckKeyword& keyword,
-                                  const SupportedKeywordItems<T>& supported_options,
-                                  std::vector<ValidationError>& errors) const;
-
         const UnsupportedKeywords m_unsupported_keywords;
         const SupportedKeywords m_partially_supported_keywords;
         const SupportedKeywords m_fully_supported_keywords;
-        const std::unordered_map<std::string, ValidationFunction> m_special_validation;
+        const ValidatorMap m_special_validation;
     };
 
 
@@ -155,10 +157,9 @@ struct SupportedKeywords {
     class allow_values
     {
     public:
-        allow_values(const std::initializer_list<T>& allowed_values)
-        {
-            std::ranges::copy(allowed_values, std::back_inserter(m_allowed_values));
-        }
+        allow_values(std::initializer_list<T> allowed_values)
+            : m_allowed_values(allowed_values)
+        {}
 
         bool operator()(const T& value) const
         {
@@ -169,7 +170,8 @@ struct SupportedKeywords {
         std::vector<T> m_allowed_values;
     };
 
-    // Helper to test if given string value is convertible to bool (see DeckItem::to_bool)
+    // Helper to test if given string value is convertible to bool (see
+    // DeckItem::to_bool)
     struct is_bool_convertible {
         is_bool_convertible() {}
         bool operator()(const std::string& value) const {
@@ -181,9 +183,7 @@ struct SupportedKeywords {
         }
     };
 
-} // namespace KeywordValidation
-
-} // namespace Opm
+}} // namespace Opm::KeywordValidation
 
 
 #endif
