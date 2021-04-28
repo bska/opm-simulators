@@ -856,12 +856,11 @@ void PhaseSaturations<MaterialLawManager, FluidSystem, Region, CellID>::deriveWa
                 sw = this->invertCapPress(pcow, this->waterPos(), isIncr);
             }
             else {
-                auto [swout, newSwatInit] = this->applySwatInit(pcow);
-                if (newSwatInit)
-                    sw = this->invertCapPress(pcow, this->waterPos(), isIncr);
-                else {
-                    sw = swout;
-                }
+                const auto& [swout, newSwatInit] = this->applySwatInit(pcow);
+
+                sw = !newSwatInit
+                    ? swout
+                    : this->invertCapPress(pcow, this->waterPos(), isIncr);
             }
         }
     }
