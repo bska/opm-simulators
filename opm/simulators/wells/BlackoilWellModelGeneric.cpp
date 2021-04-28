@@ -366,12 +366,11 @@ initializeWellPerfData()
         auto& parallelWellInfo = this->local_parallel_well_info_[well_index].get();
         parallelWellInfo.beginReset();
 
-
         for (const auto& connection : well.getConnections()) {
-
             const int active_index = well.is_lgr_well()
                 ? compressedIndexForInteriorLGR(well.get_lgr_well_tag().value(), connection)
                 : this->compressedIndexForInterior(connection.global_index());
+
             const auto connIsOpen =
                 connection.state() == Connection::State::OPEN;
 
