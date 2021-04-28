@@ -235,24 +235,27 @@ EclGenericWriter(const Schedule& schedule,
     , equilCartMapper_(equilCartMapper)
     , equilGrid_      (equilGrid)
 {
+    using UgGridHelpers::createEclipseGrid;
+
     // Make sure outputNnc_ vector has at least 1 entry in all ranks.
-    outputNnc_.resize(1);
+    this->outputNnc_.resize(1);
 
     if (this->collectOnIORank_.isIORank()) {
+        const auto& es = this->eclState_;
+
         this->eclIO_ = std::make_unique<EclipseIO>
-            (this->eclState_,
-             UgGridHelpers::createEclipseGrid(*equilGrid, eclState_.getInputGrid()),
+            (es, createEclipseGrid(*equilGrid, es.getInputGrid()),
              this->schedule_, summaryConfig, "", enableEsmry);
     }
 
     // create output thread if enabled and rank is I/O rank
     // async output is enabled by default if pthread are enabled
     int numWorkerThreads = 0;
-    if (enableAsyncOutput && collectOnIORank_.isIORank()) {
+    if (enableAsyncOutput && this->collectOnIORank_.isIORank()) {
         numWorkerThreads = 1;
     }
 
-    this->taskletRunner_.reset(new TaskletRunner(numWorkerThreads));
+    this->taskletRunner_ = std::make_unique<TaskletRunner>(numWorkerThreads);
 }
 
 template<class Grid, class EquilGrid, class GridView, class ElementMapper, class Scalar>
