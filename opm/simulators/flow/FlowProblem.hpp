@@ -761,14 +761,17 @@ public:
         }
     }
 
-    void finalizeOutput() {
+    void finalizeOutput()
+    {
         OPM_TIMEBLOCK(finalizeOutput);
-        // this will write all pending output to disk
-        // to avoid corruption of output files
-        eclWriter_.reset();
+
+        // this will write all pending output to disk to avoid corruption of
+        // output files
+        this->eclWriter_.reset();
     }
 
 
+    
     /*!
      * \copydoc FvBaseMultiPhaseProblem::intrinsicPermeability
      */
