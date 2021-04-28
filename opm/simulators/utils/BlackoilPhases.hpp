@@ -47,22 +47,21 @@ namespace Opm
         PhaseUsage() = default;
         explicit PhaseUsage(std::vector<BlackoilPhases::PhaseIndex> phases);
 
+        std::array<int, MaxNumPhases + NumCryptoPhases> phase_used{};
+        std::array<int, MaxNumPhases + NumCryptoPhases> phase_pos{};
 
-        std::array<int, MaxNumPhases + NumCryptoPhases> phase_used;
-        std::array<int, MaxNumPhases + NumCryptoPhases> phase_pos;
+        int num_phases{0};
+        bool has_solvent{false};
+        bool has_polymer{false};
+        bool has_energy{false};
 
-        int num_phases;
-        bool has_solvent{};
-        bool has_polymer{};
-        bool has_energy{};
         // polymer molecular weight
-        bool has_polymermw{};
-        bool has_foam{};
-        bool has_brine{};
-        bool has_zFraction{};
-        bool has_micp{};
-        bool has_co2_or_h2store{};
-
+        bool has_polymermw{false};
+        bool has_foam{false};
+        bool has_brine{false};
+        bool has_zFraction{false};
+        bool has_micp{false};
+        bool has_co2_or_h2store{false};
     };
 
 } // namespace Opm
