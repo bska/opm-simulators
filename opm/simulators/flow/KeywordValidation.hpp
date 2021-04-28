@@ -40,7 +40,9 @@ class DeckKeyword;
 class ErrorGuard;
 class ParseContext;
 
-namespace KeywordValidation
+} // namespace Opm
+
+namespace Opm { namespace KeywordValidation
 {
     // Describe an unsupported keyword:
     struct UnsupportedKeywordProperties {
@@ -57,15 +59,18 @@ namespace KeywordValidation
     };
 
     // This is used to list unsupported kewyords.
-    using UnsupportedKeywords = std::map<std::string, UnsupportedKeywordProperties>;
+    using UnsupportedKeywords =
+        std::map<std::string, UnsupportedKeywordProperties>;
 
     // This is used to list the partially supported items of a keyword:
     template <typename T>
-    using PartiallySupportedKeywordItems = std::map<std::size_t, PartiallySupportedKeywordProperties<T>>;
+    using PartiallySupportedKeywordItems =
+        std::map<std::size_t, PartiallySupportedKeywordProperties<T>>;
 
     // This is used to list the keywords that have partially supported items:
     template <typename T>
-    using PartiallySupportedKeywords = std::map<std::string, PartiallySupportedKeywordItems<T>>;
+    using PartiallySupportedKeywords =
+        std::map<std::string, PartiallySupportedKeywordItems<T>>;
 
     // This contains the information needed to report a single error occurence.
     // The validator will construct a vector of these, copying the relevant
@@ -97,18 +102,23 @@ namespace KeywordValidation
     class KeywordValidator
     {
     public:
+        using Validator =
+            std::function<void(const DeckKeyword&            keyword,
+                               std::vector<ValidationError>& errors)>;
+
+        using ValidatorMap = std::unordered_map<std::string, Validator>;
+
         KeywordValidator(const UnsupportedKeywords& keywords,
                          const PartiallySupportedKeywords<std::string>& string_items,
                          const PartiallySupportedKeywords<int>& int_items,
                          const PartiallySupportedKeywords<double>& double_items,
-                         const std::unordered_map<std::string, std::function<void(const DeckKeyword& keyword, std::vector<ValidationError>& errors)>>& special_validation)
+                         const ValidatorMap& special_validation)
             : m_keywords(keywords)
             , m_string_items(string_items)
             , m_int_items(int_items)
             , m_double_items(double_items)
             , m_special_validation(special_validation)
-        {
-        }
+        {}
 
         // Validate a deck, reporting warnings and errors. If there are only
         // warnings, these will be reported. If there are errors, these are
@@ -134,7 +144,6 @@ namespace KeywordValidation
                                  const T& item_value,
                                  std::vector<ValidationError>& errors) const;
 
-
         template <typename T>
         void validateKeywordItems(const DeckKeyword& keyword,
                                   const PartiallySupportedKeywords<T>& partially_supported_options,
@@ -144,7 +153,7 @@ namespace KeywordValidation
         const PartiallySupportedKeywords<std::string> m_string_items;
         const PartiallySupportedKeywords<int> m_int_items;
         const PartiallySupportedKeywords<double> m_double_items;
-        const std::unordered_map<std::string, std::function<void(const DeckKeyword& keyword, std::vector<ValidationError>& errors)>> m_special_validation;
+        const ValidatorMap m_special_validation;
     };
 
 
@@ -153,26 +162,22 @@ namespace KeywordValidation
     class allow_values
     {
     public:
-        allow_values(const std::initializer_list<T>& allowed_values)
-        {
-            for (auto item : allowed_values) {
-                m_allowed_values.push_back(item);
-            }
-        }
+        allow_values(std::initializer_list<T> allowed_values)
+            : m_allowed_values(allowed_values)
+        {}
 
         bool operator()(const T& value) const
         {
-            return std::find(m_allowed_values.begin(), m_allowed_values.end(), value) != m_allowed_values.end();
+            return std::find(this->m_allowed_values.begin(),
+                             this->m_allowed_values.end(), value)
+                != this->m_allowed_values.end();
         }
 
     private:
         std::vector<T> m_allowed_values;
     };
 
-
-} // namespace KeywordValidation
-
-} // namespace Opm
+}} // namespace Opm::KeywordValidation
 
 
 #endif
