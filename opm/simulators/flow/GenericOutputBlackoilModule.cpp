@@ -460,50 +460,56 @@ template<class FluidSystem>
 void GenericOutputBlackoilModule<FluidSystem>::
 addRftDataToWells(data::Wells& wellDatas, std::size_t reportStepNum)
 {
-    const auto& rft_config = schedule_[reportStepNum].rft_config();
-    for (const auto& well: schedule_.getWells(reportStepNum)) {
+    if (! schedule_[reportStepNum].rft_config().active())
+        return;
 
+    const auto& gdims = eclState_.gridDims();
+    for (const auto& wname: schedule_.wellNames(reportStepNum)) {
         // don't bother with wells not on this process
-        if (isDefunctParallelWell(well.name())) {
+        if (isDefunctParallelWell(wname)) {
             continue;
         }
 
         //add data infrastructure for shut wells
-        if (!wellDatas.count(well.name())) {
-            data::Well wellData;
+        if (! wellDatas.count(wname)) {
+            const auto& wcon = schedule_[reportStepNum]
+                .getWell(wname, reportStepNum)
+                .getConnections();
 
-            if (!rft_config.active())
-                continue;
+            auto& xw = wellDatas[wname];
 
-            wellData.connections.resize(well.getConnections().size());
-            std::size_t count = 0;
+            xw.connections.resize(wcon.size());
+            auto count = decltype(wcon.size()){0};
             for (const auto& connection: well.getConnections()) {
-                const std::size_t i = std::size_t(connection.getI());
-                const std::size_t j = std::size_t(connection.getJ());
-                const std::size_t k = std::size_t(connection.getK());
+                const auto i = std::size_t(connection.getI());
+                const auto j = std::size_t(connection.getJ());
+                const auto k = std::size_t(connection.getK());
 
-                const std::size_t index = eclState_.gridDims().getGlobalIndex(i, j, k);
-                auto& connectionData = wellData.connections[count];
-                connectionData.index = index;
-                count++;
+                xw.connections[count++].index = gdims.getGlobalIndex(i, j, k);
             }
-            wellDatas.emplace(std::make_pair(well.name(), wellData));
         }
 
-        data::Well& wellData = wellDatas.at(well.name());
-        for (auto& connectionData: wellData.connections) {
+        for (auto& connectionData: wellDatas.at(wname).connections) {
             const auto index = connectionData.index;
-            if (oilConnectionPressures_.count(index) > 0)
-                connectionData.cell_pressure = oilConnectionPressures_.at(index);
-            if (waterConnectionSaturations_.count(index) > 0)
-                connectionData.cell_saturation_water = waterConnectionSaturations_.at(index);
-            if (gasConnectionSaturations_.count(index) > 0)
-                connectionData.cell_saturation_gas = gasConnectionSaturations_.at(index);
+
+            auto opress = this->oilConnectionPressures_.find(index);
+            auto sw = this->waterConnectionSaturations_.find(index);
+            auto sg = this->gasConnectionSaturations_.find(index);
+
+            if (opress != this->oilConnectionPressures_.end())
+                connectionData.cell_pressure = opress->second;
+
+            if (sw != this->waterConnectionSaturations_.end())
+                connectionData.cell_saturation_water = sw->second;
+
+            if (sg != this->gasConnectionSaturations_.end())
+                connectionData.cell_saturation_gas = sg->second;
         }
     }
-    oilConnectionPressures_.clear();
-    waterConnectionSaturations_.clear();
-    gasConnectionSaturations_.clear();
+
+    this->oilConnectionPressures_.clear();
+    this->waterConnectionSaturations_.clear();
+    this->gasConnectionSaturations_.clear();
 }
 
 template<class FluidSystem>
