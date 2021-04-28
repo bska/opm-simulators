@@ -2026,19 +2026,12 @@ namespace Opm
             return conns[connIx[perf]].CF();
         };
 
-        auto obtain = [](const Eval& value)
-                      {
-                          return getValue(value);
-                      };
-
         auto& tmult = ws.perf_data.connection_compaction_tmult;
         auto& ctf   = ws.perf_data.connection_transmissibility_factor;
 
         for (int perf = 0; perf < this->number_of_local_perforations_; ++perf) {
-            const int cell_idx = this->well_cells_[perf];
-            Scalar trans_mult(0.0);
-            getTransMult(trans_mult, simulator, cell_idx, obtain);
-            tmult[perf] = trans_mult;
+            this->getTransMult(tmult[perf], simulator, this->well_cells_[perf],
+                               [](const auto& eval) { return getValue(eval); });
 
             ctf[perf] = connCF(perf) * tmult[perf];
         }
