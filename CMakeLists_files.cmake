@@ -106,6 +106,7 @@ list (APPEND MAIN_SOURCE_FILES
   opm/simulators/timestepping/AdaptiveSimulatorTimer.cpp
   opm/simulators/timestepping/AdaptiveTimeStepping.cpp
   opm/simulators/timestepping/ConvergenceReport.cpp
+  opm/simulators/timestepping/NonlinearConvergenceRate.cpp
   opm/simulators/timestepping/SimulatorReport.cpp
   opm/simulators/timestepping/SimulatorTimer.cpp
   opm/simulators/timestepping/SimulatorTimerInterface.cpp
@@ -534,6 +535,12 @@ list (APPEND PUBLIC_HEADER_FILES
   opm/simulators/flow/equil/EquilibrationHelpers_impl.hpp
   opm/simulators/flow/equil/InitStateEquil.hpp
   opm/simulators/flow/equil/InitStateEquil_impl.hpp
+<<<<<<< HEAD
+=======
+  opm/core/props/BlackoilPhases.hpp
+  opm/core/props/phaseUsageFromDeck.hpp
+  opm/core/props/satfunc/RelpermDiagnostics.hpp
+>>>>>>> x
   opm/simulators/wells/SegmentState.hpp
   opm/simulators/wells/WellContainer.hpp
   opm/simulators/aquifers/AquiferAnalytical.hpp
@@ -578,11 +585,13 @@ list (APPEND PUBLIC_HEADER_FILES
   opm/simulators/timestepping/AdaptiveTimeStepping.hpp
   opm/simulators/timestepping/ConvergenceReport.hpp
   opm/simulators/timestepping/EclTimeSteppingParams.hpp
-  opm/simulators/timestepping/TimeStepControl.hpp
-  opm/simulators/timestepping/TimeStepControlInterface.hpp
+  opm/simulators/timestepping/NonlinearConvergenceRate.hpp
+  opm/simulators/timestepping/SimulatorReport.hpp
   opm/simulators/timestepping/SimulatorTimer.hpp
   opm/simulators/timestepping/SimulatorReport.hpp
   opm/simulators/timestepping/SimulatorTimerInterface.hpp
+  opm/simulators/timestepping/TimeStepControl.hpp
+  opm/simulators/timestepping/TimeStepControlInterface.hpp
   opm/simulators/timestepping/gatherConvergenceReport.hpp
   opm/simulators/utils/BlackoilPhases.hpp
   opm/simulators/utils/ComponentName.hpp
