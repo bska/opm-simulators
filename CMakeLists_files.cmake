@@ -191,6 +191,7 @@ list (APPEND MAIN_SOURCE_FILES
   opm/simulators/timestepping/AdaptiveTimeStepping.cpp
   opm/simulators/timestepping/ConvergenceReport.cpp
   opm/simulators/timestepping/EclTimeSteppingParams.cpp
+  opm/simulators/timestepping/NonlinearConvergenceRate.cpp
   opm/simulators/timestepping/SimulatorReport.cpp
   opm/simulators/timestepping/SimulatorTimer.cpp
   opm/simulators/timestepping/SimulatorTimerInterface.cpp
@@ -1125,11 +1126,13 @@ list (APPEND PUBLIC_HEADER_FILES
   opm/simulators/timestepping/AdaptiveTimeStepping_impl.hpp
   opm/simulators/timestepping/ConvergenceReport.hpp
   opm/simulators/timestepping/EclTimeSteppingParams.hpp
-  opm/simulators/timestepping/TimeStepControl.hpp
-  opm/simulators/timestepping/TimeStepControlInterface.hpp
+  opm/simulators/timestepping/NonlinearConvergenceRate.hpp
+  opm/simulators/timestepping/SimulatorReport.hpp
   opm/simulators/timestepping/SimulatorTimer.hpp
   opm/simulators/timestepping/SimulatorReport.hpp
   opm/simulators/timestepping/SimulatorTimerInterface.hpp
+  opm/simulators/timestepping/TimeStepControl.hpp
+  opm/simulators/timestepping/TimeStepControlInterface.hpp
   opm/simulators/timestepping/gatherConvergenceReport.hpp
   opm/simulators/utils/ComponentName.hpp
   opm/simulators/utils/DeferredLogger.hpp
