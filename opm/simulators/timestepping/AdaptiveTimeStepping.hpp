@@ -236,6 +236,14 @@ void registerAdaptiveParameters();
                         OpmLog::debug("Overall linear iterations used: " + std::to_string(substepReport.total_linear_iterations));
                     }
                 }
+                catch (const LowConvergenceRate& e) {
+                    substepReport = solver.failureReport();
+                    causeOfFailure =
+                        std::string{ "Solver convergence failure - " } + e.what();
+
+                    logException_(e, solverVerbose_);
+                    // since linearIterations is < 0 this will restart the solver
+                }
                 catch (const TooManyIterations& e) {
                     substepReport = solver.failureReport();
                     causeOfFailure = "Solver convergence failure - Iteration limit reached";
@@ -285,11 +293,11 @@ void registerAdaptiveParameters();
 
                 report += substepReport;
 
-                bool continue_on_uncoverged_solution = ignoreConvergenceFailure_ &&
-                                                       !substepReport.converged  &&
-                                                       dt <= minTimeStep_;
+                const auto continue_on_uncoverged_solution = this->ignoreConvergenceFailure_
+                    && !substepReport.converged
+                    && (dt <= this->minTimeStep_);
 
-                if (continue_on_uncoverged_solution && solverVerbose_) {
+                if (continue_on_uncoverged_solution && this->solverVerbose_) {
                     const auto msg = fmt::format(
                         "Solver failed to converge but timestep "
                         "{} is smaller or equal to {}\n"
