@@ -159,6 +159,12 @@ namespace Opm
             this->res_convergence_.emplace_back(std::forward<Args>(args)...);
         }
 
+        template <typename... Args>
+        void setWellConvergenceMetric(Args&&... args)
+        {
+            this->well_convergence_.emplace_back(std::forward<Args>(args)...);
+        }
+
         void setWellGroupTargetsViolated(const bool wellGroupTargetsViolated)
         {
             wellGroupTargetsViolated_ = wellGroupTargetsViolated;
@@ -241,6 +247,11 @@ namespace Opm
             return res_convergence_;
         }
 
+        const std::vector<ReservoirConvergenceMetric>& wellConvergence() const
+        {
+            return this->well_convergence_;
+        }
+
         const std::vector<WellFailure>& wellFailures() const
         {
             return well_failures_;
@@ -269,6 +280,7 @@ namespace Opm
         std::vector<ReservoirFailure> res_failures_;
         std::vector<WellFailure> well_failures_;
         std::vector<ReservoirConvergenceMetric> res_convergence_;
+        std::vector<ReservoirConvergenceMetric> well_convergence_;
         bool wellGroupTargetsViolated_;
         double pvFracCnvViol_{};
         double pvFracCnvViolDenom_{};
