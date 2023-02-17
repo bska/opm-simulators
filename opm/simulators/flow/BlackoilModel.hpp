@@ -24,8 +24,6 @@
 #ifndef OPM_BLACKOILMODEL_HEADER_INCLUDED
 #define OPM_BLACKOILMODEL_HEADER_INCLUDED
 
-#include <fmt/format.h>
-
 #include <opm/common/ErrorMacros.hpp>
 #include <opm/common/Exceptions.hpp>
 #include <opm/common/OpmLog/OpmLog.hpp>
@@ -41,8 +39,10 @@
 #include <opm/simulators/flow/FlowProblemBlackoil.hpp>
 #include <opm/simulators/flow/NonlinearSolver.hpp>
 #include <opm/simulators/flow/RSTConv.hpp>
+#include <opm/simulators/linalg/ISTLSolverEbos.hpp>
 #include <opm/simulators/timestepping/AdaptiveTimeStepping.hpp>
 #include <opm/simulators/timestepping/ConvergenceReport.hpp>
+#include <opm/simulators/timestepping/NonlinearConvergenceRate.hpp>
 #include <opm/simulators/timestepping/SimulatorReport.hpp>
 #include <opm/simulators/timestepping/SimulatorTimer.hpp>
 
@@ -325,6 +325,14 @@ namespace Opm {
             return report;
         }
 
+        void defineConvergenceRegion(NonlinearConvergenceRate& nonlinConvRate) const
+        {
+            // Convergence region is defined by strict MB and CNV tolerances only.
+
+            nonlinConvRate.defineTarget()
+                .mb (this->param_.tolerance_mb_)
+                .cnv(this->param_.tolerance_cnv_);
+        }
 
         void initialLinearization(SimulatorReportSingle& report,
                                   const int iteration,
@@ -429,29 +437,31 @@ namespace Opm {
             SimulatorReportSingle report;
             Dune::Timer perfTimer;
 
-            this->initialLinearization(report, iteration, nonlinear_solver.minIter(), nonlinear_solver.maxIter(), timer);
+            this->initialLinearization(iteration, timer, report, nonlinear_solver);
 
             // -----------   If not converged, solve linear system and do Newton update  -----------
-            if (!report.converged) {
+            if (! nonlinear_solver.stopNonlinearIteration(report.converged, iteration)) {
                 perfTimer.reset();
                 perfTimer.start();
                 report.total_newton_iterations = 1;
 
                 // Compute the nonlinear update.
-                unsigned nc = simulator_.model().numGridDof();
-                BVector x(nc);
+                BVector x(simulator_.model().numGridDof());
 
                 // Solve the linear system.
                 linear_solve_setup_time_ = 0.0;
                 try {
-                    // Apply the Schur complement of the well model to
-                    // the reservoir linearized equations.
-                    // Note that linearize may throw for MSwells.
-                    wellModel().linearize(simulator().model().linearizer().jacobian(),
-                                          simulator().model().linearizer().residual());
+                    // Apply well model's Schur complement to linearized
+                    // equations from reservoir.
+                    //
+                    // Linearize() may throw for MS wells.
+                    {
+                        auto& linearizer = this->simulator().model().linearizer();
+                        wellModel().linearize(linearizer.jacobian(), linearizer.residual());
+                    }
 
                     // ---- Solve linear system ----
-                    solveJacobianSystem(x);
+                    this->solveJacobianSystem(x);
 
                     report.linear_solve_setup_time += linear_solve_setup_time_;
                     report.linear_solve_time += perfTimer.stop();
@@ -469,10 +479,12 @@ namespace Opm {
                 perfTimer.reset();
                 perfTimer.start();
 
-                // handling well state update before oscillation treatment is a decision based
-                // on observation to avoid some big performance degeneration under some circumstances.
-                // there is no theorectical explanation which way is better for sure.
-                wellModel().postSolve(x);
+                // Handling well state update before oscillation treatment
+                // is a decision based on observation to avoid some big
+                // performance degeneration under some circumstances.  There
+                // is no basis in theory to support doing it in this order
+                // instead of the other.
+                this->wellModel().postSolve(x);
 
                 if (param_.use_update_stabilization_) {
                     // Stabilize the nonlinear update.
@@ -494,7 +506,7 @@ namespace Opm {
                 // ---- Newton update ----
                 // Apply the update, with considering model-dependent limitations and
                 // chopping of the update.
-                updateSolution(x);
+                this->updateSolution(x);
 
                 report.update_time += perfTimer.stop();
             }
@@ -631,14 +643,14 @@ namespace Opm {
         /// r is the residual.
         void solveJacobianSystem(BVector& x)
         {
-            auto& jacobian = simulator_.model().linearizer().jacobian().istlMatrix();
-            auto& residual = simulator_.model().linearizer().residual();
-            auto& linSolver = simulator_.model().newtonMethod().linearSolver();
+            auto& linearizer = this->simulator().model().linearizer();
+            auto& ebosJac    = linearizer.jacobian().istlMatrix();
+            auto& ebosResid  = linearizer.residual();
+            auto& ebosSolver = this->simulator().model().newtonMethod().linearSolver();
 
-            const int numSolvers = linSolver.numAvailableSolvers();
-            if ((numSolvers > 1) && (linSolver.getSolveCount() % 100 == 0)) {
-
-                if ( terminal_output_ ) {
+            const int numSolvers = ebosSolver.numAvailableSolvers();
+            if ((numSolvers > 1) && (ebosSolver.getSolveCount() % 100 == 0)) {
+                if (this->terminal_output_) {
                     OpmLog::debug("\nRunning speed test for comparing available linear solvers.");
                 }
 
