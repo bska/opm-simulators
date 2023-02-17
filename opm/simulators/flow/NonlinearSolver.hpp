@@ -33,11 +33,21 @@
 #include <opm/models/utils/propertysystem.hh>
 #include <opm/models/utils/basicproperties.hh>
 
+#include <opm/simulators/timestepping/ConvergenceReport.hpp>
+#include <opm/simulators/timestepping/NonlinearConvergenceRate.hpp>
 #include <opm/simulators/timestepping/SimulatorReport.hpp>
 #include <opm/simulators/timestepping/SimulatorTimerInterface.hpp>
 #include <opm/simulators/timestepping/TimeStepControl.hpp>
 
+#include <algorithm>
+#include <cmath>
+#include <iomanip>
 #include <memory>
+#include <sstream>
+#include <stdexcept>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace Opm::Parameters {
 
@@ -123,6 +133,8 @@ struct NonlinearSolverParameters
             if (!model_) {
                 OPM_THROW(std::logic_error, "Must provide a non-null model argument for NonlinearSolver.");
             }
+
+            this->model_->defineConvergenceRegion(this->nonlinConvRate_);
         }
 
 
@@ -137,6 +149,7 @@ struct NonlinearSolverParameters
 
             // Set up for main solver loop.
             bool converged = false;
+            this->resetConvergenceRate();
 
             // ----------  Main nonlinear solver loop  ----------
             do {
@@ -159,15 +172,10 @@ struct NonlinearSolverParameters
                     throw;
                 }
             }
-            while ( (!converged && (model_->simulator().problem().iterationContext().iteration() <= this->model().param().newton_max_iter_)) ||
-                    (model_->simulator().problem().iterationContext().iteration() <= this->model().param().newton_min_iter_));
+            while (! this->stopNonlinearIteration(converged, iteration));
 
-            if (!converged) {
-                failureReport_ = report;
-
-                std::string msg = "Solver convergence failure - Failed to complete a time step within ";
-                msg += std::to_string(model().param().newton_max_iter_) + " iterations.";
-                OPM_THROW_NOLOG(TooManyIterations, msg);
+            if (! converged) {
+                this->classifyConvergenceFailureAndThrow(report, iteration);
             }
             auto relativeChange = model_->relativeChange();
             if (timeStepControl && !timeStepControl->timeStepAccepted(relativeChange, timer.currentStepLength())) {
@@ -181,6 +189,7 @@ struct NonlinearSolverParameters
             }
 
             report.converged = true;
+
             return report;
         }
 
@@ -236,6 +245,43 @@ struct NonlinearSolverParameters
                                        this->relaxRelTol(), 1, oscillate, stagnate);
         }
 
+        void resetConvergenceRate()
+        {
+            this->nonlinConvRate_.clear();
+        }
+
+        void measureConvergenceRate(const ConvergenceReport& convRep)
+        {
+            this->nonlinConvRate_.measureRate(convRep);
+        }
+
+        bool stopNonlinearIteration(const bool converged,
+                                    const int  iteration) const
+        {
+            if (iteration <= this->minIter()) {
+                return false;
+            }
+
+            if (converged) {
+                return true;
+            }
+
+#if 0
+            return iteration >= this->maxIter();
+#else
+
+            if (iteration >= this->maxIter()) {
+                const auto dist = this->nonlinConvRate_.currentDistance();
+                const auto impr = this->nonlinConvRate_.improvements().back();
+
+                return ! ((dist > 0.0) || (std::abs(impr) > 0.0))
+                    || (std::ceil(dist / impr)
+                        > std::min(this->maxIter() / 5.0, 5.0));
+            }
+
+            return this->nonlinConvRate_.numConvergenceViolations() > std::size_t{4};
+#endif
+        }
 
         /// Apply a stabilization to dx, depending on dxOld and relaxation parameters.
         /// Implemention for Dune block vectors.
@@ -269,6 +315,7 @@ struct NonlinearSolverParameters
         // ---------  Data members  ---------
         SimulatorReportSingle failureReport_;
         SolverParameters param_;
+        NonlinearConvergenceRate nonlinConvRate_{};
         std::unique_ptr<PhysicalModel> model_;
         int linearizations_;
         int nonlinearIterations_;
@@ -277,6 +324,33 @@ struct NonlinearSolverParameters
         int nonlinearIterationsLast_;
         int linearIterationsLast_;
         int wellIterationsLast_;
+
+        [[noreturn]] void
+        classifyConvergenceFailureAndThrow(const SimulatorReportSingle& report,
+                                           const int                    iteration)
+        {
+            this->failureReport_ = report;
+
+            std::ostringstream msg{};
+
+            if (iteration >= this->maxIter()) {
+                msg << "Solver convergence failure - "
+                       "Failed to complete a time step "
+                       "within "
+                    << this->maxIter()
+                    << " iterations.";
+
+                OPM_THROW_NOLOG(TooManyIterations, msg.str());
+            }
+            else {
+                msg << "Apparent non-linear convergence "
+                       "behaviour is too erratic after "
+                    << iteration
+                    << " iterations";
+
+                OPM_THROW_NOLOG(LowConvergenceRate, msg.str());
+            }
+        }
     };
 
 } // namespace Opm
