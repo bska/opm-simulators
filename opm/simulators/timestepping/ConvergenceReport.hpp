@@ -377,6 +377,11 @@ namespace Opm
             return res_convergence_;
         }
 
+        const std::vector<ReservoirConvergenceMetric>& wellConvergence() const
+        {
+            return this->well_convergence_;
+        }
+
         const std::vector<WellFailure>& wellFailures() const
         {
             return well_failures_;

@@ -35,12 +35,12 @@
 #include <opm/simulators/linalg/ISTLSolver.hpp>
 
 #include <opm/simulators/timestepping/ConvergenceReport.hpp>
+#include <opm/simulators/timestepping/NonlinearConvergenceRate.hpp>
 #include <opm/simulators/timestepping/SimulatorReport.hpp>
 #include <opm/simulators/timestepping/SimulatorTimer.hpp>
 
 #include <opm/simulators/utils/ComponentName.hpp>
 
-#include <opm/simulators/wells/BlackoilWellModel.hpp>
 
 #include <memory>
 #include <tuple>
