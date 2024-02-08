@@ -175,6 +175,7 @@ list (APPEND MAIN_SOURCE_FILES
   opm/simulators/linalg/FlexibleSolver7.cpp
   opm/simulators/linalg/FlowLinearSolverParameters.cpp
   opm/simulators/linalg/ISTLSolver.cpp
+  opm/simulators/linalg/LeastSquaresProblemSequence.cpp
   opm/simulators/linalg/MILU.cpp
   opm/simulators/linalg/ParallelIstlInformation.cpp
   opm/simulators/linalg/ParallelOverlappingILU0.cpp
@@ -492,6 +493,7 @@ list (APPEND TEST_SOURCE_FILES
   tests/test_interregflows.cpp
   tests/test_invert.cpp
   tests/test_keyword_validator.cpp
+  tests/test_least_squares_problem_sequence.cpp
   tests/test_LogOutputHelper.cpp
   tests/test_milu.cpp
   tests/test_multmatrixtransposed.cpp
@@ -1078,6 +1080,7 @@ list (APPEND PUBLIC_HEADER_FILES
   opm/simulators/linalg/linalgproperties.hh
   opm/simulators/linalg/LinearSolverAcceleratorType.hpp
   opm/simulators/linalg/linearsolverreport.hh
+  opm/simulators/linalg/LeastSquaresProblemSequence.hpp
   opm/simulators/linalg/matrixblock.hh
   opm/simulators/linalg/MatrixMarketSpecializations.hpp
   opm/simulators/linalg/nullborderlistmanager.hh
