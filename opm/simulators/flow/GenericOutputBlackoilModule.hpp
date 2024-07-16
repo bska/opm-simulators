@@ -15,6 +15,7 @@
 
   You should have received a copy of the GNU General Public License
   along with OPM.  If not, see <http://www.gnu.org/licenses/>.
+
   Consult the COPYING file in the top-level source directory of this
   module for the precise wording of the license and the list of
   copyright holders.
@@ -40,6 +41,8 @@
 #include <opm/simulators/flow/InterRegFlows.hpp>
 #include <opm/simulators/flow/LogOutputHelper.hpp>
 #include <opm/simulators/flow/MechContainer.hpp>
+#include <opm/simulators/flow/NormalisedTotalConcVariation.hpp>
+#include <opm/simulators/flow/RegionConcVariation.hpp>
 #include <opm/simulators/flow/RegionPhasePVAverage.hpp>
 #include <opm/simulators/flow/RFTContainer.hpp>
 #include <opm/simulators/flow/RSTConv.hpp>
@@ -237,6 +240,11 @@ public:
         return this->interRegionFlows_.wantInterRegflowSummary();
     }
 
+    bool needCO2ConcentrationVariation_SPE11() const
+    {
+        return this->concVariation_SPE11_.has_value();
+    }
+
     const std::map<std::pair<std::string, int>, double>& getBlockData()
     {
         return blockData_;
@@ -370,6 +378,8 @@ protected:
 
     InterRegFlowMap interRegionFlows_;
     LogOutputHelper<Scalar> logOutput_;
+    std::optional<NormalisedTotalConcVariation<Scalar>> concVariation_SPE11_{};
+    std::optional<RegionNormalisedTotalConcVariation<Scalar>> regionConcVariation_SPE11_{};
 
     bool enableEnergy_{false};
     bool constantTemperature_{false};

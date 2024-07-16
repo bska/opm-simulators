@@ -36,6 +36,7 @@
 #include <opm/common/OpmLog/OpmLog.hpp>
 #include <opm/common/utility/Visitor.hpp>
 
+#include <opm/input/eclipse/EclipseState/Runspec.hpp>
 #include <opm/input/eclipse/EclipseState/SummaryConfig/SummaryConfig.hpp>
 
 #include <opm/material/common/Valgrind.hpp>
@@ -61,6 +62,7 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <cmath>
 #include <cstddef>
 #include <functional>
 #include <stdexcept>
@@ -173,6 +175,7 @@ public:
             if (collectOnIORank.isIORank()) {
                 OpmLog::error(msg);
             }
+
             OPM_THROW_NOLOG(std::runtime_error, msg);
         }
 
@@ -190,6 +193,29 @@ public:
                          (const std::string& rsetName) -> decltype(auto)
                          { return fp.get().get_int(rsetName); });
         }
+    }
+
+    void finishInit()
+    {
+        if (! wantNormalisedConcentrationVariation(this->summaryConfig_)) {
+            return;
+        }
+
+        this->concVariation_SPE11_.emplace();
+
+        this->concVariation_SPE11_->initialise
+            (this->simulator_.vanguard().gridView(),
+             this->simulator_.model().elementMapper(),
+             this->simulator_.problem().eclTransmissibilities());
+
+        const auto& fp = this->eclState_.fieldProps();
+
+        this->regionConcVariation_SPE11_.emplace
+            (fp.fip_regions(),
+             [&fp](const std::string& regName) -> decltype(auto)
+             { return fp.get_int(regName); },
+             declaredMaxRegionID(this->eclState_.runspec()),
+             this->simulator_.vanguard().grid().comm());
     }
 
     /*!
@@ -282,6 +308,32 @@ public:
 
             Extractor::process(ectx, extractors_);
         }
+    }
+
+    void processCO2ConcentrationVariation_SPE11(const ElementContext& elemCtx)
+    {
+        assert (this->concVariation_SPE11_.has_value());
+
+        const auto dofIdx  = 0u;
+        const auto timeIdx = 0u;
+
+        const auto cellIx = elemCtx.globalSpaceIndex(dofIdx, timeIdx);
+        const auto& iq = elemCtx.intensiveQuantities(dofIdx, timeIdx);
+        const auto& fs = iq.fluidState();
+
+        const auto xwg = FluidSystem::phaseIsActive(waterPhaseIdx)
+            ? FluidSystem::convertRswToXwG(getValue(fs.Rsw()), fs.pvtRegionIndex())
+            : FluidSystem::convertRsToXoG (getValue(fs.Rs()) , fs.pvtRegionIndex());
+
+        assert (std::isfinite(xwg));
+
+        this->concVariation_SPE11_->accumulate(cellIx, xwg);
+    }
+
+    void processRegionCO2ConcentrationVariation_SPE11(const std::size_t cell,
+                                                      const Scalar      concVar)
+    {
+        this->regionConcVariation_SPE11_->addConcVariation(cell, concVar);
     }
 
     void processElementBlockData(const ElementContext& elemCtx)
@@ -450,6 +502,7 @@ public:
                        CartesianIndex&&      cartesianIndex)
     {
         OPM_TIMEBLOCK_LOCAL(processFluxes, Subsystem::Output);
+
         const auto identifyCell = [&activeIndex, &cartesianIndex](const Element& elem)
             -> InterRegFlowMap::Cell
         {
@@ -462,9 +515,9 @@ public:
             };
         };
 
-        const auto timeIdx = 0u;
+        const auto  timeIdx = 0u;
+        const auto  numInteriorFaces = elemCtx.numInteriorFaces(timeIdx);
         const auto& stencil = elemCtx.stencil(timeIdx);
-        const auto numInteriorFaces = elemCtx.numInteriorFaces(timeIdx);
 
         for (auto scvfIdx = 0 * numInteriorFaces; scvfIdx < numInteriorFaces; ++scvfIdx) {
             const auto& face = stencil.interiorFace(scvfIdx);
@@ -503,6 +556,34 @@ public:
     const InterRegFlowMap& getInterRegFlows() const
     {
         return this->interRegionFlows_;
+    }
+
+    void prepareCO2ConcentrationVariation_SPE11()
+    {
+        this->concVariation_SPE11_->prepareAccumulation();
+    }
+
+    template <typename ElementMapper>
+    void finaliseCO2ConcentrationVariation_SPE11(const GridView&      gv,
+                                                 const ElementMapper& emap)
+    {
+        this->concVariation_SPE11_->endAccumulation(gv, emap);
+    }
+
+    const std::vector<Scalar>&
+    getLocalCO2ConcentrationVariation_SPE11()
+    {
+        return this->concVariation_SPE11_->concVariation();
+    }
+
+    void prepareRegionCO2ConcentrationVariation_SPE11()
+    {
+        this->regionConcVariation_SPE11_->prepareAccumulation();
+    }
+
+    void finaliseRegionCO2ConcentrationVariation_SPE11(const Parallel::Communication& comm)
+    {
+        this->regionConcVariation_SPE11_->accumulateParallel(comm);
     }
 
     template <class FluidState>

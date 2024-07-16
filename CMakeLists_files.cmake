@@ -154,6 +154,7 @@ list (APPEND MAIN_SOURCE_FILES
   opm/simulators/flow/partitionCells.cpp
   opm/simulators/flow/RFTContainer.cpp
   opm/simulators/flow/RSTConv.cpp
+  opm/simulators/flow/RegionConcVariation.cpp
   opm/simulators/flow/RegionPhasePVAverage.cpp
   opm/simulators/flow/SimulatorConvergenceOutput.cpp
   opm/simulators/flow/SimulatorFullyImplicitBlackoil.cpp
@@ -1006,6 +1007,8 @@ list (APPEND PUBLIC_HEADER_FILES
   opm/simulators/flow/NewTranFluxModule.hpp
   opm/simulators/flow/NlddReporting.hpp
   opm/simulators/flow/NonlinearSolver.hpp
+  opm/simulators/flow/NormalisedTotalConcVariation.hpp
+  opm/simulators/flow/NormalisedTotalConcVariation_impl.hpp
   opm/simulators/flow/OutputBlackoilModule.hpp
   opm/simulators/flow/OutputCompositionalModule.hpp
   opm/simulators/flow/OutputExtractor.hpp
@@ -1014,6 +1017,7 @@ list (APPEND PUBLIC_HEADER_FILES
   opm/simulators/flow/priVarsPacking.hpp
   opm/simulators/flow/RFTContainer.hpp
   opm/simulators/flow/RSTConv.hpp
+  opm/simulators/flow/RegionConcVariation.hpp
   opm/simulators/flow/RegionPhasePVAverage.hpp
   opm/simulators/flow/SimulatorConvergenceOutput.hpp
   opm/simulators/flow/SimulatorFullyImplicitBlackoil.hpp
