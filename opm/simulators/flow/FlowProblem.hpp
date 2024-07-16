@@ -37,7 +37,7 @@
 #include <opm/common/utility/TimeService.hpp>
 
 #include <opm/input/eclipse/EclipseState/EclipseState.hpp>
-#include <opm/input/eclipse/Parser/ParserKeywords/E.hpp>
+#include <opm/input/eclipse/EclipseState/SummaryConfig/SummaryConfig.hpp>
 #include <opm/input/eclipse/Schedule/Schedule.hpp>
 
 #include <opm/material/common/ConditionalStorage.hpp>
@@ -280,7 +280,7 @@ public:
                               simulator.vanguard().cartesianIndexMapper(),
                               simulator.vanguard().grid(),
                               simulator.vanguard().cellCentroids(),
-                              enableEnergy,
+                              enableEnergy || wantNormalisedConcentrationVariation(simulator.vanguard().summaryConfig()),
                               enableDiffusion,
                               enableDispersion)
         , thresholdPressures_(simulator)
@@ -296,8 +296,10 @@ public:
                          simulator.vanguard().grid().comm())
     {
         this->model().addOutputModule(new VtkTracerModule<TypeTag>(simulator));
+
         // Tell the black-oil extensions to initialize their internal data structures
         const auto& vanguard = simulator.vanguard();
+
         SolventModule::initFromState(vanguard.eclState(), vanguard.schedule());
         PolymerModule::initFromState(vanguard.eclState());
         FoamModule::initFromState(vanguard.eclState());
@@ -308,12 +310,14 @@ public:
         DiffusionModule::initFromState(vanguard.eclState());
 
         // create the ECL writer
-        eclWriter_ = std::make_unique<EclWriterType>(simulator);
+        this->eclWriter_ = std::make_unique<EclWriterType>(simulator);
+
 #if HAVE_DAMARIS
         // create Damaris writer
         damarisWriter_ = std::make_unique<DamarisWriterType>(simulator);
         enableDamarisOutput_ = Parameters::get<TypeTag, Parameters::EnableDamarisOutput>();
 #endif
+
         enableDriftCompensation_ = Parameters::get<TypeTag, Parameters::EnableDriftCompensation>();
 
         enableEclOutput_ = Parameters::get<TypeTag, Parameters::EnableEclOutput>();
@@ -323,19 +327,16 @@ public:
         this->initialTimeStepSize_ = Parameters::get<TypeTag, Parameters::InitialTimeStepSize>();
         this->maxTimeStepAfterWellEvent_ = Parameters::get<TypeTag, Parameters::TimeStepAfterEventInDays>() * 24 * 60 * 60;
 
-        // The value N for this parameter is defined in the following order of presedence:
-        // 1. Command line value (--num-pressure-points-equil=N)
-        // 2. EQLDIMS item 2
-        // Default value is defined in opm-common/src/opm/input/eclipse/share/keywords/000_Eclipse100/E/EQLDIMS
-        if (Parameters::isSet<TypeTag, Parameters::NumPressurePointsEquil>())
-        {
-            this->numPressurePointsEquil_ = Parameters::get<TypeTag, Parameters::NumPressurePointsEquil>();
-        } else {
-            this->numPressurePointsEquil_ = simulator.vanguard().eclState().getTableManager().getEqldims().getNumDepthNodesP();
-        }
+        // The value N for this parameter is defined in the following order of precedence:
+        //   1. Command line value (--num-pressure-points-equil=N)
+        //   2. EQLDIMS item 2
+        // Default value in the second case is defined in
+        // opm-common/opm/input/eclipse/share/keywords/000_Eclipse100/E/EQLDIMS
+        this->numPressurePointsEquil_ = Parameters::isSet<TypeTag, Parameters::NumPressurePointsEquil>()
+            ? Parameters::get<TypeTag, Parameters::NumPressurePointsEquil>()
+            : vanguard.eclState().getTableManager().getEqldims().getNumDepthNodesP();
 
         explicitRockCompaction_ = Parameters::get<TypeTag, Parameters::ExplicitRockCompaction>();
-
 
         RelpermDiagnostics relpermDiagnostics;
         relpermDiagnostics.diagnosis(vanguard.eclState(), vanguard.cartesianIndexMapper());
@@ -347,35 +348,48 @@ public:
     void finishInit()
     {
         ParentType::finishInit();
+
         auto& simulator = this->simulator();
 
         auto finishTransmissibilities = [updated = false, this]() mutable
         {
             if (updated) { return; }
+
             this->transmissibilities_.finishInit([&vg = this->simulator().vanguard()](const unsigned int it) {
                 return vg.gridIdxToEquilGridIdx(it);
             });
+
             updated = true;
         };
 
-        // calculating the TRANX, TRANY, TRANZ and NNC for output purpose
-        // for parallel running, it is based on global trans_
-        // for serial running, it is based on the transmissibilities_
-        // we try to avoid for the parallel running, has both global trans_ and transmissibilities_ allocated at the same time
-        if (enableEclOutput_) {
-            if (simulator.vanguard().grid().comm().size() > 1) {
-                if (simulator.vanguard().grid().comm().rank() == 0)
-                    eclWriter_->setTransmissibilities(&simulator.vanguard().globalTransmissibility());
-            } else {
+        // Calculate the TRANX, TRANY, TRANZ and NNC arrays for output
+        // purposes.  In parallel runs, this process is based on the global
+        // trans_ object.  In a sequential run, the process uses the
+        // transmissibilities_ object.  We try to avoid having both the
+        // global trans_ and and the transmissibilities_ objects being
+        // allocated at the same time in parallel runs.
+        if (this->enableEclOutput_) {
+            if (const auto& comm = simulator.vanguard().grid().comm();
+                comm.size() > 1)
+            {
+                if (comm.rank() == 0) {
+                    this->eclWriter_->setTransmissibilities
+                        (&simulator.vanguard().globalTransmissibility());
+                }
+            }
+            else {
                 finishTransmissibilities();
-                eclWriter_->setTransmissibilities(&simulator.problem().eclTransmissibilities());
+
+                this->eclWriter_->setTransmissibilities
+                    (&simulator.problem().eclTransmissibilities());
             }
 
-            std::function<unsigned int(unsigned int)> equilGridToGrid = [&simulator](unsigned int i) {
-                return simulator.vanguard().gridEquilIdxToGridIdx(i);
-            };
-            eclWriter_->extractOutputTransAndNNC(equilGridToGrid);
+            this->eclWriter_->extractOutputTransAndNNC([&vg = simulator.vanguard()](const unsigned int i)
+            {
+                return vg.gridEquilIdxToGridIdx(i);
+            });
         }
+
         simulator.vanguard().releaseGlobalTransmissibilities();
 
         const auto& eclState = simulator.vanguard().eclState();
@@ -396,16 +410,22 @@ public:
         // disables gravity, else the standard value of the gravity constant at sea level
         // on earth is used
         this->gravity_ = 0.0;
-        if (Parameters::get<TypeTag, Parameters::EnableGravity>())
+        if (Parameters::get<TypeTag, Parameters::EnableGravity>()) {
             this->gravity_[dim - 1] = 9.80665;
-        if (!eclState.getInitConfig().hasGravity())
+        }
+
+        if (!eclState.getInitConfig().hasGravity()) {
             this->gravity_[dim - 1] = 0.0;
+        }
 
         if (this->enableTuning_) {
             // if support for the TUNING keyword is enabled, we get the initial time
             // steping parameters from it instead of from command line parameters
             const auto& tuning = schedule[0].tuning();
-            this->initialTimeStepSize_ = tuning.TSINIT.has_value() ? tuning.TSINIT.value() : -1.0;
+
+            this->initialTimeStepSize_ = tuning.TSINIT.has_value()
+                ? tuning.TSINIT.value() : -1.0;
+
             this->maxTimeStepAfterWellEvent_ = tuning.TMAXWC;
         }
 
@@ -417,36 +437,43 @@ public:
                                 eclState.runspec().tabdims().getNumPVTTables());
 
         if (FluidSystem::phaseIsActive(FluidSystem::oilPhaseIdx) &&
-            FluidSystem::phaseIsActive(FluidSystem::gasPhaseIdx)) {
+            FluidSystem::phaseIsActive(FluidSystem::gasPhaseIdx))
+        {
             this->maxOilSaturation_.resize(this->model().numGridDof(), 0.0);
         }
 
         this->readRockParameters_(simulator.vanguard().cellCenterDepths(),
-                                  [&simulator](const unsigned idx)
+                                  [&vg = simulator.vanguard()](const unsigned idx)
                                   {
-                                      std::array<int,dim> coords;
-                                      simulator.vanguard().cartesianCoordinate(idx, coords);
+                                      std::array<int,dim> coords{};
+                                      vg.cartesianCoordinate(idx, coords);
                                       for (auto& c : coords) {
                                           ++c;
                                       }
                                       return coords;
                                   });
+
         readMaterialParameters_();
         readThermalParameters_();
 
         // write the static output files (EGRID, INIT)
         if (enableEclOutput_) {
-            eclWriter_->writeInit();
+            this->eclWriter_->finishInit();
+            this->eclWriter_->writeInit();
         }
 
         finishTransmissibilities();
 
         const auto& initconfig = eclState.getInitConfig();
-        tracerModel_.init(initconfig.restartRequested());
-        if (initconfig.restartRequested())
-            readEclRestartSolution_();
-        else
-            readInitialCondition_();
+
+        this->tracerModel_.init(initconfig.restartRequested());
+
+        if (initconfig.restartRequested()) {
+            this->readEclRestartSolution_();
+        }
+        else {
+            this->readInitialCondition_();
+        }
 
         tracerModel_.prepareTracerBatches();
 
@@ -455,7 +482,7 @@ public:
         if constexpr (getPropValue<TypeTag, Properties::EnablePolymer>()) {
             const auto& vanguard = this->simulator().vanguard();
             const auto& gridView = vanguard.gridView();
-            int numElements = gridView.size(/*codim=*/0);
+            const int numElements = gridView.size(/*codim=*/0);
             this->polymer_.maxAdsorption.resize(numElements, 0.0);
         }
 
