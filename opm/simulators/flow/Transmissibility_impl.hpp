@@ -117,6 +117,16 @@ Transmissibility(const EclipseState& eclState,
     transmissibilityThreshold_  = unitSystem.parse("Transmissibility").getSIScaling() * 1e-6;
 }
 
+template <class Grid, class GridView, class ElementMapper, class CartesianIndexMapper, class Scalar>
+void Transmissibility<Grid, GridView, ElementMapper, CartesianIndexMapper, Scalar>::
+distanceVector(const unsigned int elemIdx, DimVector& fc) const
+{
+    const auto cc = this->centroids_(elemIdx);
+
+    std::transform(fc.begin(), fc.end(), cc.begin(),
+                   fc.begin(), std::minus<>{});
+}
+
 template<class Grid, class GridView, class ElementMapper, class CartesianIndexMapper, class Scalar>
 Scalar Transmissibility<Grid,GridView,ElementMapper,CartesianIndexMapper,Scalar>::
 transmissibility(unsigned elemIdx1, unsigned elemIdx2) const
