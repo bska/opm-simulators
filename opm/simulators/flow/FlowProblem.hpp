@@ -37,6 +37,7 @@
 #include <opm/common/utility/TimeService.hpp>
 
 #include <opm/input/eclipse/EclipseState/EclipseState.hpp>
+#include <opm/input/eclipse/EclipseState/SummaryConfig/SummaryConfig.hpp>
 #include <opm/input/eclipse/Schedule/Schedule.hpp>
 #include <opm/input/eclipse/Units/Units.hpp>
 
@@ -224,8 +225,10 @@ public:
                               simulator.vanguard().cartesianIndexMapper(),
                               simulator.vanguard().grid(),
                               simulator.vanguard().cellCentroids(),
-                              (energyModuleType == EnergyModules::FullyImplicitThermal ||
-                               energyModuleType == EnergyModules::SequentialImplicitThermal),                       enableDiffusion,
+                              (energyModuleType == EnergyModules::FullyImplicitThermal) ||
+                              (energyModuleType == EnergyModules::SequentialImplicitThermal) ||
+                              wantNormalisedConcentrationVariation(simulator.vanguard().summaryConfig()),
+                              enableDiffusion,
                               enableDispersion)
         , wellModel_(simulator)
         , aquiferModel_(simulator)
