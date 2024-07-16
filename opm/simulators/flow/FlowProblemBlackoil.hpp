@@ -300,25 +300,34 @@ public:
             updated = true;
         };
 
-        // calculating the TRANX, TRANY, TRANZ and NNC for output purpose
-        // for parallel running, it is based on global trans_
-        // for serial running, it is based on the transmissibilities_
-        // we try to avoid for the parallel running, has both global trans_ and transmissibilities_ allocated at the same time
-        if (enableEclOutput_) {
-            if (simulator.vanguard().grid().comm().size() > 1) {
-                if (simulator.vanguard().grid().comm().rank() == 0)
-                    eclWriter_->setTransmissibilities(&simulator.vanguard().globalTransmissibility());
-            } else {
+        // Calculate the TRANX, TRANY, TRANZ and NNC arrays for output
+        // purposes.  In parallel runs, this process is based on the global
+        // trans_ object.  In a sequential run, the process uses the
+        // transmissibilities_ object.  We try to avoid having both the
+        // global trans_ and and the transmissibilities_ objects being
+        // allocated at the same time in parallel runs.
+        if (this->enableEclOutput_) {
+            if (const auto& comm = simulator.vanguard().grid().comm();
+                comm.size() > 1)
+            {
+                if (comm.rank() == 0) {
+                    this->eclWriter_->setTransmissibilities
+                        (&simulator.vanguard().globalTransmissibility());
+                }
+            }
+            else {
                 finishTransmissibilities();
-                eclWriter_->setTransmissibilities(&simulator.problem().eclTransmissibilities());
+
+                this->eclWriter_->setTransmissibilities
+                    (&simulator.problem().eclTransmissibilities());
             }
 
-            std::function<unsigned int(unsigned int)> equilGridToGrid = [&simulator](unsigned int i) {
-                return simulator.vanguard().gridEquilIdxToGridIdx(i);
-            };
-
-            this->eclWriter_->extractOutputTransAndNNC(equilGridToGrid);
+            this->eclWriter_->extractOutputTransAndNNC([&vg = simulator.vanguard()](const unsigned int i)
+            {
+                return vg.gridEquilIdxToGridIdx(i);
+            });
         }
+
         simulator.vanguard().releaseGlobalTransmissibilities();
 
         const auto& eclState = simulator.vanguard().eclState();
@@ -350,7 +359,10 @@ public:
             // if support for the TUNING keyword is enabled, we get the initial time
             // steping parameters from it instead of from command line parameters
             const auto& tuning = schedule[0].tuning();
-            this->initialTimeStepSize_ = tuning.TSINIT.has_value() ? tuning.TSINIT.value() : -1.0;
+
+            this->initialTimeStepSize_ = tuning.TSINIT.has_value()
+                ? tuning.TSINIT.value() : -1.0;
+
             this->maxTimeStepAfterWellEvent_ = tuning.TMAXWC;
         }
 
@@ -362,12 +374,13 @@ public:
         FluidSystem::setEnergyEqualEnthalpy(conserveInnerEnergy);
 
         if (FluidSystem::phaseIsActive(FluidSystem::oilPhaseIdx) &&
-            FluidSystem::phaseIsActive(FluidSystem::gasPhaseIdx)) {
+            FluidSystem::phaseIsActive(FluidSystem::gasPhaseIdx))
+        {
             this->maxOilSaturation_.resize(this->model().numGridDof(), 0.0);
         }
 
         this->readRockParameters_(simulator.vanguard().cellCenterDepths(),
-                                  [&simulator](const unsigned idx)
+                                  [&vg = simulator.vanguard()](const unsigned idx)
                                   {
                                       std::array<int,dim> coords;
                                       simulator.vanguard().cartesianCoordinate(idx, coords);
@@ -387,6 +400,7 @@ public:
         finishTransmissibilities();
 
         const auto& initconfig = eclState.getInitConfig();
+
         this->tracerModel_.init(initconfig.restartRequested());
         if (initconfig.restartRequested()) {
             this->readEclRestartSolution_();
