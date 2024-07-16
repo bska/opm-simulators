@@ -37,7 +37,7 @@
 #include <opm/common/utility/TimeService.hpp>
 
 #include <opm/input/eclipse/EclipseState/EclipseState.hpp>
-#include <opm/input/eclipse/Parser/ParserKeywords/E.hpp>
+#include <opm/input/eclipse/EclipseState/SummaryConfig/SummaryConfig.hpp>
 #include <opm/input/eclipse/Schedule/Schedule.hpp>
 
 #include <opm/material/common/ConditionalStorage.hpp>
@@ -216,7 +216,7 @@ public:
                               simulator.vanguard().cartesianIndexMapper(),
                               simulator.vanguard().grid(),
                               simulator.vanguard().cellCentroids(),
-                              enableEnergy,
+                              enableEnergy || wantNormalisedConcentrationVariation(simulator.vanguard().summaryConfig()),
                               enableDiffusion,
                               enableDispersion)
         , wellModel_(simulator)
@@ -234,19 +234,16 @@ public:
         this->initialTimeStepSize_ = Parameters::Get<Parameters::InitialTimeStepSize<Scalar>>();
         this->maxTimeStepAfterWellEvent_ = Parameters::Get<Parameters::TimeStepAfterEventInDays<Scalar>>() * 24 * 60 * 60;
 
-        // The value N for this parameter is defined in the following order of presedence:
-        // 1. Command line value (--num-pressure-points-equil=N)
-        // 2. EQLDIMS item 2
-        // Default value is defined in opm-common/src/opm/input/eclipse/share/keywords/000_Eclipse100/E/EQLDIMS
-        if (Parameters::IsSet<Parameters::NumPressurePointsEquil>())
-        {
-            this->numPressurePointsEquil_ = Parameters::Get<Parameters::NumPressurePointsEquil>();
-        } else {
-            this->numPressurePointsEquil_ = simulator.vanguard().eclState().getTableManager().getEqldims().getNumDepthNodesP();
-        }
+        // The value N for this parameter is defined in the following order of precedence:
+        //   1. Command line value (--num-pressure-points-equil=N)
+        //   2. EQLDIMS item 2
+        // Default value in the second case is defined in
+        // opm-common/opm/input/eclipse/share/keywords/000_Eclipse100/E/EQLDIMS
+        this->numPressurePointsEquil_ = Parameters::IsSet<Parameters::NumPressurePointsEquil>()
+            ? Parameters::Get<Parameters::NumPressurePointsEquil>(
+            : vanguard.eclState().getTableManager().getEqldims().getNumDepthNodesP();
 
         explicitRockCompaction_ = Parameters::Get<Parameters::ExplicitRockCompaction>();
-
 
         RelpermDiagnostics relpermDiagnostics;
         relpermDiagnostics.diagnosis(vanguard.eclState(), vanguard.cartesianIndexMapper());

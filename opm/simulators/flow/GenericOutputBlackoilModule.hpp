@@ -15,6 +15,7 @@
 
   You should have received a copy of the GNU General Public License
   along with OPM.  If not, see <http://www.gnu.org/licenses/>.
+
   Consult the COPYING file in the top-level source directory of this
   module for the precise wording of the license and the list of
   copyright holders.
@@ -35,6 +36,8 @@
 #include <opm/simulators/flow/FlowsData.hpp>
 #include <opm/simulators/flow/InterRegFlows.hpp>
 #include <opm/simulators/flow/LogOutputHelper.hpp>
+#include <opm/simulators/flow/NormalisedTotalConcVariation.hpp>
+#include <opm/simulators/flow/RegionConcVariation.hpp>
 #include <opm/simulators/flow/RegionPhasePVAverage.hpp>
 
 #include <opm/simulators/utils/ParallelCommunication.hpp>
@@ -65,13 +68,9 @@ public:
     // Virtual destructor for safer inheritance.
     virtual ~GenericOutputBlackoilModule();
 
-     Scalar* getPRESSURE_ptr(void) {
-        return (this->fluidPressure_.data()) ;
-    };
+    const Scalar* getPRESSURE_ptr() const { return this->fluidPressure_.data(); }
 
-    int  getPRESSURE_size( void ) {
-        return (this->fluidPressure_.size()) ;
-    };
+    int getPRESSURE_size() const { return this->fluidPressure_.size(); }
 
     void outputTimeStamp(const std::string& lbl,
                          double elapsed,
@@ -101,11 +100,11 @@ public:
                          const Parallel::Communication& comm);
 
     void outputFipAndResvLog(const Inplace& inplace,
-                         const std::size_t reportStepNum,
-                         double elapsed,
-                         boost::posix_time::ptime currentDate,
-                         const bool substep,
-                         const Parallel::Communication& comm);
+                             const std::size_t reportStepNum,
+                             double elapsed,
+                             boost::posix_time::ptime currentDate,
+                             const bool substep,
+                             const Parallel::Communication& comm);
 
     void outputErrorLog(const Parallel::Communication& comm) const;
 
@@ -267,6 +266,11 @@ public:
         return this->interRegionFlows_.wantInterRegflowSummary();
     }
 
+    bool needCO2ConcentrationVariation_SPE11() const
+    {
+        return this->concVariation_SPE11_.has_value();
+    }
+
     const std::map<std::pair<std::string, int>, double>& getBlockData()
     {
         return blockData_;
@@ -389,6 +393,8 @@ protected:
 
     InterRegFlowMap interRegionFlows_;
     LogOutputHelper<Scalar> logOutput_;
+    std::optional<NormalisedTotalConcVariation<Scalar>> concVariation_SPE11_{};
+    std::optional<RegionNormalisedTotalConcVariation<Scalar>> regionConcVariation_SPE11_{};
 
     bool enableEnergy_{false};
     bool enableTemperature_{false};

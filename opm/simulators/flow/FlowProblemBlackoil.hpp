@@ -209,6 +209,7 @@ public:
         // create the ECL writer
         eclWriter_ = std::make_unique<EclWriterType>(simulator);
         enableEclOutput_ = Parameters::Get<Parameters::EnableEclOutput>();
+
 #if HAVE_DAMARIS
         // create Damaris writer
         damarisWriter_ = std::make_unique<DamarisWriterType>(simulator);
@@ -248,39 +249,49 @@ public:
      */
     void finishInit()
     {
-        // TODO: there should be room to remove duplication for this function,
-        // but there is relatively complicated logic in the function calls in this function
-        // some refactoring is needed for this function
-        FlowProblemType::finishInit();
+        ParentType::finishInit();
+
         auto& simulator = this->simulator();
 
         auto finishTransmissibilities = [updated = false, this]() mutable
         {
             if (updated) { return; }
+
             this->transmissibilities_.finishInit([&vg = this->simulator().vanguard()](const unsigned int it) {
                 return vg.gridIdxToEquilGridIdx(it);
             });
+
             updated = true;
         };
 
-        // calculating the TRANX, TRANY, TRANZ and NNC for output purpose
-        // for parallel running, it is based on global trans_
-        // for serial running, it is based on the transmissibilities_
-        // we try to avoid for the parallel running, has both global trans_ and transmissibilities_ allocated at the same time
-        if (enableEclOutput_) {
-            if (simulator.vanguard().grid().comm().size() > 1) {
-                if (simulator.vanguard().grid().comm().rank() == 0)
-                    eclWriter_->setTransmissibilities(&simulator.vanguard().globalTransmissibility());
-            } else {
+        // Calculate the TRANX, TRANY, TRANZ and NNC arrays for output
+        // purposes.  In parallel runs, this process is based on the global
+        // trans_ object.  In a sequential run, the process uses the
+        // transmissibilities_ object.  We try to avoid having both the
+        // global trans_ and and the transmissibilities_ objects being
+        // allocated at the same time in parallel runs.
+        if (this->enableEclOutput_) {
+            if (const auto& comm = simulator.vanguard().grid().comm();
+                comm.size() > 1)
+            {
+                if (comm.rank() == 0) {
+                    this->eclWriter_->setTransmissibilities
+                        (&simulator.vanguard().globalTransmissibility());
+                }
+            }
+            else {
                 finishTransmissibilities();
-                eclWriter_->setTransmissibilities(&simulator.problem().eclTransmissibilities());
+
+                this->eclWriter_->setTransmissibilities
+                    (&simulator.problem().eclTransmissibilities());
             }
 
-            std::function<unsigned int(unsigned int)> equilGridToGrid = [&simulator](unsigned int i) {
-                return simulator.vanguard().gridEquilIdxToGridIdx(i);
-            };
-            eclWriter_->extractOutputTransAndNNC(equilGridToGrid);
+            this->eclWriter_->extractOutputTransAndNNC([&vg = simulator.vanguard()](const unsigned int i)
+            {
+                return vg.gridEquilIdxToGridIdx(i);
+            });
         }
+
         simulator.vanguard().releaseGlobalTransmissibilities();
 
         const auto& eclState = simulator.vanguard().eclState();
@@ -301,79 +312,95 @@ public:
         // disables gravity, else the standard value of the gravity constant at sea level
         // on earth is used
         this->gravity_ = 0.0;
-        if (Parameters::Get<Parameters::EnableGravity>())
+        if (Parameters::Get<Parameters::EnableGravity>()) {
             this->gravity_[dim - 1] = 9.80665;
-        if (!eclState.getInitConfig().hasGravity())
+        }
+
+        if (!eclState.getInitConfig().hasGravity()) {
             this->gravity_[dim - 1] = 0.0;
+        }
 
         if (this->enableTuning_) {
             // if support for the TUNING keyword is enabled, we get the initial time
             // steping parameters from it instead of from command line parameters
             const auto& tuning = schedule[0].tuning();
-            this->initialTimeStepSize_ = tuning.TSINIT.has_value() ? tuning.TSINIT.value() : -1.0;
+
+            this->initialTimeStepSize_ = tuning.TSINIT.has_value()
+                ? tuning.TSINIT.value() : -1.0;
+
             this->maxTimeStepAfterWellEvent_ = tuning.TMAXWC;
         }
 
         this->initFluidSystem_();
 
-
+        // deal with DRSDT
+        this->mixControls_.init(this->model().numGridDof(),
+                                this->episodeIndex(),
+                                eclState.runspec().tabdims().getNumPVTTables());
 
         if (FluidSystem::phaseIsActive(FluidSystem::oilPhaseIdx) &&
-            FluidSystem::phaseIsActive(FluidSystem::gasPhaseIdx)) {
+            FluidSystem::phaseIsActive(FluidSystem::gasPhaseIdx))
+        {
             this->maxOilSaturation_.resize(this->model().numGridDof(), 0.0);
         }
 
         this->readRockParameters_(simulator.vanguard().cellCenterDepths(),
-                                  [&simulator](const unsigned idx)
+                                  [&vg = simulator.vanguard()](const unsigned idx)
                                   {
-                                      std::array<int,dim> coords;
-                                      simulator.vanguard().cartesianCoordinate(idx, coords);
+                                      std::array<int,dim> coords{};
+                                      vg.cartesianCoordinate(idx, coords);
                                       for (auto& c : coords) {
                                           ++c;
                                       }
                                       return coords;
                                   });
-        this->readMaterialParameters_();
-        this->readThermalParameters_();
+
+        readMaterialParameters_();
+        readThermalParameters_();
 
         // write the static output files (EGRID, INIT)
         if (enableEclOutput_) {
-            eclWriter_->writeInit();
+            this->eclWriter_->finishInit();
+            this->eclWriter_->writeInit();
         }
 
         finishTransmissibilities();
 
         const auto& initconfig = eclState.getInitConfig();
+
         this->tracerModel_.init(initconfig.restartRequested());
-        if (initconfig.restartRequested())
-            readEclRestartSolution_();
-        else
-            readInitialCondition_();
 
-        this->tracerModel_.prepareTracerBatches();
+        if (initconfig.restartRequested()) {
+            this->readEclRestartSolution_();
+        }
+        else {
+            this->readInitialCondition_();
+        }
 
-        this->updatePffDofData_();
+        tracerModel_.prepareTracerBatches();
+
+        updatePffDofData_();
 
         if constexpr (getPropValue<TypeTag, Properties::EnablePolymer>()) {
             const auto& vanguard = this->simulator().vanguard();
             const auto& gridView = vanguard.gridView();
-            int numElements = gridView.size(/*codim=*/0);
+            const int numElements = gridView.size(/*codim=*/0);
             this->polymer_.maxAdsorption.resize(numElements, 0.0);
         }
 
-        this->readBoundaryConditions_();
+        readBoundaryConditions_();
 
         // compute and set eq weights based on initial b values
         computeAndSetEqWeights_();
 
-        if (this->enableDriftCompensation_) {
-            this->drift_.resize(this->model().numGridDof());
-            this->drift_ = 0.0;
+        if (enableDriftCompensation_) {
+            drift_.resize(this->model().numGridDof());
+            drift_ = 0.0;
         }
 
-        if (this->enableVtkOutput_ && eclState.getIOConfig().initOnly()) {
+        if (enableVtkOutput_ && eclState.getIOConfig().initOnly()) {
             simulator.setTimeStepSize(0.0);
-            FlowProblemType::writeOutput(true);
+            ParentType::writeOutput(true);
         }
 
         // after finishing the initialization and writing the initial solution, we move
@@ -384,12 +411,6 @@ public:
             simulator.setEpisodeIndex(0);
             simulator.setTimeStepIndex(0);
         }
-
-        // TODO: move to the end for later refactoring of the function finishInit()
-	// deal with DRSDT
-        this->mixControls_.init(this->model().numGridDof(),
-                                this->episodeIndex(),
-                                eclState.runspec().tabdims().getNumPVTTables());   
     }
 
     /*!
