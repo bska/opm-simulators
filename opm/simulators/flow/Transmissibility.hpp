@@ -74,6 +74,8 @@ public:
     const DimMatrix& permeability(unsigned elemIdx) const
     { return permeability_[elemIdx]; }
 
+    void distanceVector(const unsigned int elemIdx, DimVector& fc) const;
+
     /*!
      * \brief Return the transmissibility for the intersection between two elements.
      */

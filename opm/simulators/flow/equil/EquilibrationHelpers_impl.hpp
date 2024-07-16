@@ -33,8 +33,7 @@
 
 #include <fmt/format.h>
 
-namespace Opm {
-namespace EQUIL {
+namespace Opm { namespace EQUIL {
 
 using FluidSystemSimple = BlackOilFluidSystem<double>;
 
@@ -60,8 +59,7 @@ RsVD<FluidSystem>::RsVD(const int pvtRegionIdx,
                         const std::vector<Scalar>& rs)
     : pvtRegionIdx_(pvtRegionIdx)
     , rsVsDepth_(depth, rs)
-{
-}
+{}
 
 template<class FluidSystem>
 typename RsVD<FluidSystem>::Scalar
@@ -72,16 +70,20 @@ operator()(const Scalar depth,
            const Scalar satGas) const
 {
     const auto sat_rs = satRs(press, temp);
+
     if (satGas > std::sqrt(std::numeric_limits<Scalar>::epsilon())) {
         return sat_rs;
     }
-    else {
-        if (rsVsDepth_.xMin() > depth)
-            return std::min(sat_rs, rsVsDepth_.valueAt(0));
-        else if (rsVsDepth_.xMax() < depth)
-            return std::min(sat_rs, rsVsDepth_.valueAt(rsVsDepth_.numSamples() - 1));
-        return std::min(sat_rs, rsVsDepth_.eval(depth, /*extrapolate=*/false));
+
+    if (this->rsVsDepth_.xMin() > depth) {
+        return std::min(sat_rs, this->rsVsDepth_.valueAt(0));
     }
+
+    if (this->rsVsDepth_.xMax() < depth) {
+        return std::min(sat_rs, this->rsVsDepth_.valueAt(rsVsDepth_.numSamples() - 1));
+    }
+
+    return std::min(sat_rs, this->rsVsDepth_.eval(depth, /*extrapolate=*/false));
 }
 
 template<class FluidSystem>
@@ -97,9 +99,8 @@ PBVD<FluidSystem>::PBVD(const int pvtRegionIdx,
                         const std::vector<Scalar>& depth,
                         const std::vector<Scalar>& pbub)
     : pvtRegionIdx_(pvtRegionIdx)
-    , pbubVsDepth_(depth, pbub)
-{
-}
+    , pbubVsDepth_ (depth, pbub)
+{}
 
 template<class FluidSystem>
 typename PBVD<FluidSystem>::Scalar
@@ -109,15 +110,20 @@ operator()(const Scalar depth,
            const Scalar temp,
            const Scalar satGas) const
 {
-    Scalar press = cellPress;
+    auto press = cellPress;
+
     if (satGas <= 0.0) {
-        if (pbubVsDepth_.xMin() > depth)
+        if (pbubVsDepth_.xMin() > depth) {
             press = pbubVsDepth_.valueAt(0);
-        else if (pbubVsDepth_.xMax() < depth)
+        }
+        else if (pbubVsDepth_.xMax() < depth) {
             press = pbubVsDepth_.valueAt(pbubVsDepth_.numSamples() - 1);
-        else
+        }
+        else {
             press = pbubVsDepth_.eval(depth, /*extrapolate=*/false);
+        }
     }
+
     return satRs(std::min(press, cellPress), temp);
 }
 
@@ -135,8 +141,7 @@ PDVD<FluidSystem>::PDVD(const int pvtRegionIdx,
                         const std::vector<Scalar>& pdew)
     : pvtRegionIdx_(pvtRegionIdx)
     , pdewVsDepth_(depth, pdew)
-{
-}
+{}
 
 template<class FluidSystem>
 typename PDVD<FluidSystem>::Scalar
@@ -146,15 +151,20 @@ operator()(const Scalar depth,
            const Scalar temp,
            const Scalar satOil) const
 {
-    Scalar press = cellPress;
+    auto press = cellPress;
+
     if (satOil <= 0.0) {
-        if (pdewVsDepth_.xMin() > depth)
+        if (pdewVsDepth_.xMin() > depth) {
             press = pdewVsDepth_.valueAt(0);
-        else if (pdewVsDepth_.xMax() < depth)
+        }
+        else if (pdewVsDepth_.xMax() < depth) {
             press = pdewVsDepth_.valueAt(pdewVsDepth_.numSamples() - 1);
-        else
+        }
+        else {
             press = pdewVsDepth_.eval(depth, /*extrapolate=*/false);
+        }
     }
+
     return satRv(std::min(press, cellPress), temp);
 }
 
@@ -171,9 +181,8 @@ RvVD<FluidSystem>::RvVD(const int pvtRegionIdx,
                         const std::vector<Scalar>& depth,
                         const std::vector<Scalar>& rv)
     : pvtRegionIdx_(pvtRegionIdx)
-    , rvVsDepth_(depth, rv)
-{
-}
+    , rvVsDepth_   (depth, rv)
+{}
 
 template<class FluidSystem>
 typename RvVD<FluidSystem>::Scalar
@@ -188,17 +197,22 @@ operator()(const Scalar depth,
             "Must not pass negative oil saturation"
         };
     }
+
     const auto sat_rv = satRv(press, temp);
+
     if (satOil > std::sqrt(std::numeric_limits<Scalar>::epsilon())) {
         return sat_rv;
     }
-    else {
-        if (rvVsDepth_.xMin() > depth)
-            return std::min(sat_rv, rvVsDepth_.valueAt(0));
-        else if (rvVsDepth_.xMax() < depth)
-            return std::min(sat_rv, rvVsDepth_.valueAt(rvVsDepth_.numSamples() - 1));
-        return std::min(sat_rv, rvVsDepth_.eval(depth, /*extrapolate=*/false));
+
+    if (rvVsDepth_.xMin() > depth) {
+        return std::min(sat_rv, rvVsDepth_.valueAt(0));
     }
+
+    if (rvVsDepth_.xMax() < depth) {
+        return std::min(sat_rv, rvVsDepth_.valueAt(rvVsDepth_.numSamples() - 1));
+    }
+
+    return std::min(sat_rv, rvVsDepth_.eval(depth, /*extrapolate=*/false));
 }
 
 template<class FluidSystem>
@@ -215,8 +229,7 @@ RvwVD<FluidSystem>::RvwVD(const int pvtRegionIdx,
                           const std::vector<Scalar>& rvw)
     : pvtRegionIdx_(pvtRegionIdx)
     , rvwVsDepth_(depth, rvw)
-{
-}
+{}
 
 template<class FluidSystem>
 typename RvwVD<FluidSystem>::Scalar
@@ -233,16 +246,20 @@ operator()(const Scalar depth,
     }
 
     const auto sat_rvw = satRvw(press, temp);
+
     if (satWat > std::sqrt(std::numeric_limits<double>::epsilon())) {
-        return sat_rvw; //saturated Rvw
+        return sat_rvw; // saturated Rvw
     }
-    else {
-        if (rvwVsDepth_.xMin() > depth)
-            return std::min(sat_rvw,rvwVsDepth_.valueAt(0));
-        else if (rvwVsDepth_.xMax() < depth)
-            return std::min(sat_rvw, rvwVsDepth_.valueAt(rvwVsDepth_.numSamples() - 1));
-        return std::min(sat_rvw, rvwVsDepth_.eval(depth, /*extrapolate=*/false));
+
+    if (rvwVsDepth_.xMin() > depth) {
+        return std::min(sat_rvw, this->rvwVsDepth_.valueAt(0));
     }
+
+    if (rvwVsDepth_.xMax() < depth) {
+        return std::min(sat_rvw, this->rvwVsDepth_.valueAt(rvwVsDepth_.numSamples() - 1));
+    }
+
+    return std::min(sat_rvw, this->rvwVsDepth_.eval(depth, /*extrapolate=*/false));
 }
 
 template<class FluidSystem>
@@ -272,9 +289,8 @@ operator()(const Scalar /* depth */,
     if (satGas > std::sqrt(std::numeric_limits<Scalar>::epsilon())) {
         return satRs(press, temp);
     }
-    else {
-        return std::min(satRs(press, temp), rsSatContact_);
-    }
+
+    return std::min(satRs(press, temp), this->rsSatContact_);
 }
 
 template<class FluidSystem>
@@ -282,7 +298,8 @@ typename RsSatAtContact<FluidSystem>::Scalar
 RsSatAtContact<FluidSystem>::
 satRs(const Scalar press, const Scalar temp) const
 {
-    return FluidSystem::oilPvt().saturatedGasDissolutionFactor(pvtRegionIdx_, temp, press);
+    return FluidSystem::oilPvt()
+        .saturatedGasDissolutionFactor(pvtRegionIdx_, temp, press);
 }
 
 template<class FluidSystem>
@@ -304,9 +321,8 @@ operator()(const Scalar /*depth*/,
     if (satOil > std::sqrt(std::numeric_limits<Scalar>::epsilon())) {
         return satRv(press, temp);
     }
-    else {
-        return std::min(satRv(press, temp), rvSatContact_);
-    }
+
+    return std::min(satRv(press, temp), rvSatContact_);
 }
 
 template<class FluidSystem>
@@ -314,7 +330,8 @@ typename RvSatAtContact<FluidSystem>::Scalar
 RvSatAtContact<FluidSystem>::
 satRv(const Scalar press, const Scalar temp) const
 {
-    return FluidSystem::gasPvt().saturatedOilVaporizationFactor(pvtRegionIdx_, temp, press);;
+    return FluidSystem::gasPvt()
+        .saturatedOilVaporizationFactor(this->pvtRegionIdx_, temp, press);;
 }
 
 template<class FluidSystem>
@@ -336,9 +353,8 @@ operator()(const Scalar /*depth*/,
     if (satWat > std::sqrt(std::numeric_limits<Scalar>::epsilon())) {
         return satRvw(press, temp);
     }
-    else {
-        return std::min(satRvw(press, temp), rvwSatContact_);
-    }
+
+    return std::min(satRvw(press, temp), rvwSatContact_);
 }
 
 template<class FluidSystem>
@@ -346,7 +362,8 @@ typename RvwSatAtContact<FluidSystem>::Scalar
 RvwSatAtContact<FluidSystem>::
 satRvw(const Scalar press, const Scalar temp) const
 {
-    return FluidSystem::gasPvt().saturatedWaterVaporizationFactor(pvtRegionIdx_, temp, press);;
+    return FluidSystem::gasPvt()
+        .saturatedWaterVaporizationFactor(pvtRegionIdx_, temp, press);;
 }
 
 } // namespace Miscibility
@@ -366,8 +383,7 @@ EquilReg<Scalar>::EquilReg(const EquilRecord& rec,
     , tempVdTable_ (tempVdTable)
     , saltVdTable_ (saltVdTable)
     , pvtIdx_ (pvtIdx)
-{
-}
+{}
 
 template<class Scalar>
 Scalar EquilReg<Scalar>::datum() const
@@ -463,32 +479,37 @@ PcEq(const MaterialLawManager& materialLawManager,
     , cell_(cell)
     , targetPc_(targetPc)
 {
+    // This code should only be called for water or gas phase
+    assert(phase_ != FluidSystem::oilPhaseIdx);
 }
 
 template<class FluidSystem, class MaterialLawManager>
 typename PcEq<FluidSystem,MaterialLawManager>::Scalar
-PcEq<FluidSystem,MaterialLawManager>::
-operator()(Scalar s) const
+PcEq<FluidSystem,MaterialLawManager>::operator()(const Scalar s) const
 {
-    const auto& matParams = materialLawManager_.materialLawParams(cell_);
     SatOnlyFluidState fluidState;
     fluidState.setSaturation(FluidSystem::waterPhaseIdx, 0.0);
     fluidState.setSaturation(FluidSystem::oilPhaseIdx, 0.0);
     fluidState.setSaturation(FluidSystem::gasPhaseIdx, 0.0);
     fluidState.setSaturation(phase_, s);
 
-    // This code should only be called for water or gas phase
-    assert(phase_ != FluidSystem::oilPhaseIdx);
     // The capillaryPressure code only uses the wetting phase saturation
     if (phase_ == FluidSystem::gasPhaseIdx) {
         fluidState.setSaturation(FluidSystem::waterPhaseIdx, 1.0 - s);
         fluidState.setSaturation(FluidSystem::oilPhaseIdx, 1.0 - s);
     }
+
     std::array<Scalar, FluidSystem::numPhases> pc{0.0};
-    using MaterialLaw = typename MaterialLawManager::MaterialLaw;
-    MaterialLaw::capillaryPressures(pc, matParams, fluidState);
-    Scalar sign = (phase_ == FluidSystem::waterPhaseIdx)? -1.0 : 1.0;
-    Scalar pcPhase = pc[FluidSystem::oilPhaseIdx] + sign *  pc[phase_];
+    {
+        const auto& matParams = materialLawManager_.materialLawParams(cell_);
+
+        using MaterialLaw = typename MaterialLawManager::MaterialLaw;
+        MaterialLaw::capillaryPressures(pc, matParams, fluidState);
+    }
+
+    const Scalar sign = (phase_ == FluidSystem::waterPhaseIdx)? -1.0 : 1.0;
+    const Scalar pcPhase = pc[FluidSystem::oilPhaseIdx] + sign*pc[phase_];
+
     return pcPhase - targetPc_;
 }
 
@@ -504,16 +525,13 @@ PcEqSum(const MaterialLawManager& materialLawManager,
     , phase2_(phase2)
     , cell_(cell)
     , targetPc_(targetPc)
-{
-}
+{}
 
 template<class FluidSystem, class MaterialLawManager>
 typename PcEqSum<FluidSystem,MaterialLawManager>::Scalar
-PcEqSum<FluidSystem,MaterialLawManager>::
-operator()(Scalar s) const
+PcEqSum<FluidSystem,MaterialLawManager>::operator()(const Scalar s) const
 {
-    const auto& matParams = materialLawManager_.materialLawParams(cell_);
-    SatOnlyFluidState fluidState;
+    SatOnlyFluidState fluidState{};
     fluidState.setSaturation(FluidSystem::waterPhaseIdx, 0.0);
     fluidState.setSaturation(FluidSystem::oilPhaseIdx, 0.0);
     fluidState.setSaturation(FluidSystem::gasPhaseIdx, 0.0);
@@ -521,39 +539,47 @@ operator()(Scalar s) const
     fluidState.setSaturation(phase2_, 1.0 - s);
 
     std::array<Scalar, FluidSystem::numPhases> pc {0.0};
+    {
+        const auto& matParams = materialLawManager_.materialLawParams(cell_);
 
-    using MaterialLaw = typename MaterialLawManager::MaterialLaw;
-    MaterialLaw::capillaryPressures(pc, matParams, fluidState);
-    Scalar sign1 = (phase1_ == FluidSystem::waterPhaseIdx)? -1.0 : 1.0;
-    Scalar pc1 = pc[FluidSystem::oilPhaseIdx] + sign1 *  pc[phase1_];
-    Scalar sign2 = (phase2_ == FluidSystem::waterPhaseIdx)? -1.0 : 1.0;
-    Scalar pc2 = pc[FluidSystem::oilPhaseIdx] + sign2 *  pc[phase2_];
+        using MaterialLaw = typename MaterialLawManager::MaterialLaw;
+        MaterialLaw::capillaryPressures(pc, matParams, fluidState);
+    }
+
+    const Scalar sign1 = (phase1_ == FluidSystem::waterPhaseIdx)? -1.0 : 1.0;
+    const Scalar pc1 = pc[FluidSystem::oilPhaseIdx] + sign1*pc[phase1_];
+
+    const Scalar sign2 = (phase2_ == FluidSystem::waterPhaseIdx)? -1.0 : 1.0;
+    const Scalar pc2 = pc[FluidSystem::oilPhaseIdx] + sign2*pc[phase2_];
+
     return pc1 + pc2 - targetPc_;
 }
 
 template <class FluidSystem, class MaterialLawManager>
 typename FluidSystem::Scalar
 minSaturations(const MaterialLawManager& materialLawManager,
-                      const int phase, const int cell)
+               const int phase, const int cell)
 {
+    if (phase == FluidSystem::oilPhaseIdx) {
+        throw std::runtime_error {
+            "Minimum saturation not implemented for oil phase."
+        };
+    }
+
+    if ((phase != FluidSystem::gasPhaseIdx) &&
+        (phase != FluidSystem::waterPhaseIdx))
+    {
+        throw std::runtime_error("Unknown phase");
+    }
+
     const auto& scaledDrainageInfo =
         materialLawManager.oilWaterScaledEpsInfoDrainage(cell);
 
-    // Find minimum and maximum saturations.
-    switch(phase) {
-    case FluidSystem::waterPhaseIdx:
-        return scaledDrainageInfo.Swl;
-
-    case FluidSystem::gasPhaseIdx:
+    if (phase == FluidSystem::gasPhaseIdx) {
         return scaledDrainageInfo.Sgl;
-
-    case FluidSystem::oilPhaseIdx:
-        throw std::runtime_error("Min saturation not implemented for oil phase.");
-
-    default:
-        throw std::runtime_error("Unknown phaseIdx .");
     }
-    return -1.0;
+
+    return scaledDrainageInfo.Swl;
 }
 
 template <class FluidSystem, class MaterialLawManager>
@@ -561,24 +587,26 @@ typename FluidSystem::Scalar
 maxSaturations(const MaterialLawManager& materialLawManager,
                const int phase, const int cell)
 {
+    if (phase == FluidSystem::oilPhaseIdx) {
+        throw std::runtime_error {
+            "Maximum saturation not implemented for oil phase."
+        };
+    }
+
+    if ((phase != FluidSystem::gasPhaseIdx) &&
+        (phase != FluidSystem::waterPhaseIdx))
+    {
+        throw std::runtime_error("Unknown phase");
+    }
+
     const auto& scaledDrainageInfo =
         materialLawManager.oilWaterScaledEpsInfoDrainage(cell);
 
-    // Find minimum and maximum saturations.
-    switch(phase) {
-    case FluidSystem::waterPhaseIdx:
-        return scaledDrainageInfo.Swu;
-
-    case FluidSystem::gasPhaseIdx:
+    if (phase == FluidSystem::gasPhaseIdx) {
         return scaledDrainageInfo.Sgu;
-
-    case FluidSystem::oilPhaseIdx:
-        throw std::runtime_error("Max saturation not implemented for oil phase.");
-
-    default:
-        throw std::runtime_error("Unknown phaseIdx .");
     }
-    return -1.0;
+
+    return scaledDrainageInfo.Swu;
 }
 
 template <class FluidSystem, class MaterialLawManager>
@@ -590,28 +618,41 @@ satFromPc(const MaterialLawManager& materialLawManager,
           const bool increasing)
 {
     using Scalar = typename FluidSystem::Scalar;
+
     // Find minimum and maximum saturations.
-    Scalar s0 = increasing ? maxSaturations<FluidSystem>(materialLawManager, phase, cell) : minSaturations<FluidSystem>(materialLawManager, phase, cell);
-    Scalar s1 = increasing ? minSaturations<FluidSystem>(materialLawManager, phase, cell) : maxSaturations<FluidSystem>(materialLawManager, phase, cell);
+    const Scalar s0 = increasing
+        ? maxSaturations<FluidSystem>(materialLawManager, phase, cell)
+        : minSaturations<FluidSystem>(materialLawManager, phase, cell);
+
+    const Scalar s1 = increasing
+        ? minSaturations<FluidSystem>(materialLawManager, phase, cell)
+        : maxSaturations<FluidSystem>(materialLawManager, phase, cell);
 
     // Create the equation f(s) = pc(s) - targetPc
-    const PcEq<FluidSystem, MaterialLawManager> f(materialLawManager, phase, cell, targetPc);
-    Scalar f0 = f(s0);
-    Scalar f1 = f(s1);
-    if (!std::isfinite(f0 + f1))
-        throw std::logic_error(fmt::format("The capillary pressure values {} and {} are not finite", f0, f1));
+    const auto f = PcEq<FluidSystem, MaterialLawManager> {
+        materialLawManager, phase, cell, targetPc
+    };
 
-    if (f0 <= 0.0)
-        return s0;
-    else if (f1 >= 0.0)
-        return s1;
+    const auto f0 = f(s0);
+    const auto f1 = f(s1);
+    if (! std::isfinite(f0 + f1)) {
+        throw std::logic_error {
+            fmt::format("The capillary pressure values "
+                        "{} and {} are not both finite", f0, f1)
+        };
+    }
 
-    const Scalar tol = 1e-10;
-    // should at least converge in 2 times bisection but some safety here:
+    if (f0 <= Scalar{0}) { return s0; }
+    if (f1 >= Scalar{0}) { return s1; }
+
+    const auto tol = static_cast<Scalar>(1e-10);
+
+    // Should at least converge in 2 times bisection but some safety here:
     const int maxIter = -2*static_cast<int>(std::log2(tol)) + 10;
     int usedIterations = -1;
-    const Scalar root = RegulaFalsiBisection<ThrowOnError>::solve(f, s0, s1, maxIter, tol, usedIterations);
-    return root;
+
+    return RegulaFalsiBisection<ThrowOnError>::
+        solve(f, s0, s1, maxIter, tol, usedIterations);
 }
 
 template<class FluidSystem, class MaterialLawManager>
@@ -623,26 +664,30 @@ satFromSumOfPcs(const MaterialLawManager& materialLawManager,
                 const typename FluidSystem::Scalar targetPc)
 {
     using Scalar = typename FluidSystem::Scalar;
-    // Find minimum and maximum saturations.
-    Scalar s0 = minSaturations<FluidSystem>(materialLawManager, phase1, cell);
-    Scalar s1 = maxSaturations<FluidSystem>(materialLawManager, phase1, cell);
 
     // Create the equation f(s) = pc1(s) + pc2(1-s) - targetPc
-    const PcEqSum<FluidSystem, MaterialLawManager> f(materialLawManager, phase1, phase2, cell, targetPc);
-    Scalar f0 = f(s0);
-    Scalar f1 = f(s1);
-    if (f0 <= 0.0)
-        return s0;
-    else if (f1 >= 0.0)
-        return s1;
+    const auto f = PcEqSum<FluidSystem, MaterialLawManager> {
+        materialLawManager, phase1, phase2, cell, targetPc
+    };
 
-    assert(f0 > 0.0 && f1 < 0.0);
-    const Scalar tol = 1e-10;
+    const auto s0 = minSaturations<FluidSystem>(materialLawManager, phase1, cell);
+    const auto f0 = f(s0);
+    if (f0 <= Scalar{0}) { return s0; }
+
+    const auto s1 = maxSaturations<FluidSystem>(materialLawManager, phase1, cell);
+    const auto f1 = f(s1);
+    if (f1 >= Scalar{0}) { return s1; }
+
+    assert ((f0 > Scalar{0}) && (f1 < Scalar{0}));
+    const auto tol = static_cast<Scalar>(1e-10);
+
     // should at least converge in 2 times bisection but some safety here:
     const int maxIter = -2*static_cast<int>(std::log2(tol)) + 10;
+
     int usedIterations = -1;
-    const Scalar root = RegulaFalsiBisection<ThrowOnError>::solve(f, s0, s1, maxIter, tol, usedIterations);
-    return root;
+
+    return RegulaFalsiBisection<ThrowOnError>::
+        solve(f, s0, s1, maxIter, tol, usedIterations);
 }
 
 template<class FluidSystem, class MaterialLawManager>
@@ -654,16 +699,15 @@ satFromDepth(const MaterialLawManager& materialLawManager,
              const int cell,
              const bool increasing)
 {
-    using Scalar = typename FluidSystem::Scalar;
-    const Scalar s0 = increasing ? maxSaturations<FluidSystem>(materialLawManager, phase, cell) : minSaturations<FluidSystem>(materialLawManager, phase, cell);
-    const Scalar s1 = increasing ? minSaturations<FluidSystem>(materialLawManager, phase, cell) : maxSaturations<FluidSystem>(materialLawManager, phase, cell);
-
     if (cellDepth <= contactDepth) {
-        return s0;
+        return increasing
+            ? maxSaturations<FluidSystem>(materialLawManager, phase, cell)
+            : minSaturations<FluidSystem>(materialLawManager, phase, cell);
     }
-    else {
-        return s1;
-    }
+
+    return increasing
+        ? minSaturations<FluidSystem>(materialLawManager, phase, cell)
+        : maxSaturations<FluidSystem>(materialLawManager, phase, cell);
 }
 
 template<class FluidSystem, class MaterialLawManager>
@@ -672,12 +716,16 @@ bool isConstPc(const MaterialLawManager& materialLawManager,
                const int cell)
 {
     using Scalar = typename FluidSystem::Scalar;
+
     // Create the equation f(s) = pc(s);
-    const PcEq<FluidSystem, MaterialLawManager> f(materialLawManager, phase, cell, 0);
-    const Scalar f0 = f(minSaturations<FluidSystem>(materialLawManager, phase, cell));
-    const Scalar f1 = f(maxSaturations<FluidSystem>(materialLawManager, phase, cell));
+    const auto f = PcEq<FluidSystem, MaterialLawManager> {
+        materialLawManager, phase, cell, 0
+    };
+
+    const auto f0 = f(minSaturations<FluidSystem>(materialLawManager, phase, cell));
+    const auto f1 = f(maxSaturations<FluidSystem>(materialLawManager, phase, cell));
+
     return std::abs(f0 - f1) < std::numeric_limits<Scalar>::epsilon();
 }
 
-}
-}
+}} // namespace Opm::EQUIL

@@ -197,6 +197,11 @@ public:
         return simulator_.vanguard().equilGrid();
     }
 
+    void finishInit()
+    {
+        this->outputModule_->finishInit();
+    }
+
     /*!
      * \brief collect and pass data and pass it to eclIO writer
      */
@@ -204,45 +209,50 @@ public:
     {
         OPM_TIMEBLOCK(evalSummaryState);
         const int reportStepNum = simulator_.episodeIndex() + 1;
-
-        /*
-          The summary data is not evaluated for timestep 0, that is
-          implemented with a:
-
-             if (time_step == 0)
-                 return;
-
-          check somewhere in the summary code. When the summary code was
-          split in separate methods Summary::eval() and
-          Summary::add_timestep() it was necessary to pull this test out
-          here to ensure that the well and group related keywords in the
-          restart file, like XWEL and XGRP were "correct" also in the
-          initial report step.
-
-          "Correct" in this context means unchanged behavior, might very
-          well be more correct to actually remove this if test.
-        */
-
-        if (reportStepNum == 0)
+        
+        // The summary data is not evaluated for timestep 0, that is
+        // implemented with a:
+        //
+        //    if (time_step == 0)
+        //        return;
+        //
+        // check somewhere in the summary code. When the summary code was
+        // split in separate methods Summary::eval() and
+        // Summary::add_timestep() it was necessary to pull this test out
+        // here to ensure that the well and group related keywords in the
+        // restart file, like XWEL and XGRP were "correct" also in the
+        // initial report step.
+        //
+        // "Correct" in this context means unchanged behavior, might very
+        // well be more correct to actually remove this if test.
+        
+        if (reportStepNum == 0) {
             return;
+        }
 
-        const Scalar curTime = simulator_.time() + simulator_.timeStepSize();
         const Scalar totalCpuTime =
-            simulator_.executionTimer().realTimeElapsed() +
-            simulator_.setupTimer().realTimeElapsed() +
-            simulator_.vanguard().setupTime();
+            this->simulator_.executionTimer().realTimeElapsed() +
+            this->simulator_.setupTimer().realTimeElapsed() +
+            this->simulator_.vanguard().setupTime();
 
-        const auto localWellData            = simulator_.problem().wellModel().wellData();
-        const auto localWBP                 = simulator_.problem().wellModel().wellBlockAveragePressures();
-        const auto localGroupAndNetworkData = simulator_.problem().wellModel()
+        const auto localWellData = this->simulator_.problem().wellModel().wellData();
+        const auto localWBP      = this->simulator_.problem().wellModel()
+            .wellBlockAveragePressures();
+
+        const auto localGroupAndNetworkData = this->simulator_.problem().wellModel()
             .groupAndNetworkData(reportStepNum);
 
-        const auto localAquiferData = simulator_.problem().aquiferModel().aquiferData();
-        const auto localWellTestState = simulator_.problem().wellModel().wellTestState();
+        const auto localAquiferData   = this->simulator_.problem().aquiferModel().aquiferData();
+        const auto localWellTestState = this->simulator_.problem().wellModel().wellTestState();
+
         this->prepareLocalCellData(isSubStep, reportStepNum);
 
         if (this->outputModule_->needInterfaceFluxes(isSubStep)) {
             this->captureLocalFluxData();
+        }
+
+        if (this->outputModule_->needCO2ConcentrationVariation_SPE11()) {
+            this->captureCO2ConcentrationVariation_SPE11();
         }
 
         if (this->collectOnIORank_.isParallel()) {
@@ -278,49 +288,61 @@ public:
                                        this->simulator_.vanguard().grid().comm());
         }
 
-
-        std::map<std::string, double> miscSummaryData;
-        std::map<std::string, std::vector<double>> regionData;
-        Inplace inplace;
-
+        auto miscSummaryData = std::map<std::string, double> {};
+        auto regionData = std::map<std::string, std::vector<double>> {};
+        auto inplace = Inplace{};
+        
         {
             OPM_TIMEBLOCK(outputFipLogAndFipresvLog);
 
-            inplace = outputModule_->calc_inplace(miscSummaryData, regionData, simulator_.gridView().comm());
+            inplace = this->outputModule_->calc_inplace
+                (miscSummaryData, regionData, this->simulator_.gridView().comm());
 
-            if (this->collectOnIORank_.isIORank()){
-                inplace_ = inplace;
+            if (this->collectOnIORank_.isIORank()) {
+                this->inplace_ = inplace;
             }
         }
 
         // Add TCPU
         if (totalCpuTime != 0.0) {
-            miscSummaryData["TCPU"] = totalCpuTime;
+            miscSummaryData.insert_or_assign("TCPU", totalCpuTime);
         }
+
         if (this->sub_step_report_.total_newton_iterations != 0) {
-            miscSummaryData["NEWTON"] = this->sub_step_report_.total_newton_iterations;
+            miscSummaryData.insert_or_assign("NEWTON", this->sub_step_report_.total_newton_iterations);
         }
+
         if (this->sub_step_report_.total_linear_iterations != 0) {
-            miscSummaryData["MLINEARS"] = this->sub_step_report_.total_linear_iterations;
+            miscSummaryData.insert_or_assign("MLINEARS", this->sub_step_report_.total_linear_iterations);
         }
+
         if (this->sub_step_report_.total_newton_iterations != 0) {
-            miscSummaryData["NLINEARS"] =  static_cast<float>(this->sub_step_report_.total_linear_iterations) / this->sub_step_report_.total_newton_iterations;
+            const auto avgLinearIter = this->sub_step_report_.total_linear_iterations
+                / static_cast<float>(this->sub_step_report_.total_newton_iterations);
+
+            miscSummaryData.insert_or_assign("NLINEARS", avgLinearIter);
         }
+
         if (this->sub_step_report_.min_linear_iterations != std::numeric_limits<unsigned int>::max()) {
-            miscSummaryData["NLINSMIN"] = this->sub_step_report_.min_linear_iterations;
+            miscSummaryData.insert_or_assign("NLINSMIN", this->sub_step_report_.min_linear_iterations);
         }
+
         if (this->sub_step_report_.max_linear_iterations != 0) {
-            miscSummaryData["NLINSMAX"] = this->sub_step_report_.max_linear_iterations;
+            miscSummaryData.insert_or_assign("NLINSMAX", this->sub_step_report_.max_linear_iterations);
         }
+
         if (this->simulation_report_.success.total_linear_iterations != 0) {
-            miscSummaryData["MSUMLINS"] = this->simulation_report_.success.total_linear_iterations;
+            miscSummaryData.insert_or_assign("MSUMLINS", this->simulation_report_.success.total_linear_iterations);
         }
+
         if (this->simulation_report_.success.total_newton_iterations != 0) {
-            miscSummaryData["MSUMNEWT"] = this->simulation_report_.success.total_newton_iterations;
+            miscSummaryData.insert_or_assign("MSUMNEWT", this->simulation_report_.success.total_newton_iterations);
         }
 
         {
             OPM_TIMEBLOCK(evalSummary);
+
+            const Scalar curTime = this->simulator_.time() + simulator_.timeStepSize();
 
             const auto& blockData = this->collectOnIORank_.isParallel()
                 ? this->collectOnIORank_.globalBlockData()
@@ -438,7 +460,8 @@ public:
         OpmLog::note("");   // Blank line after all reports.
     }
 
-    void writeOutput(data::Solution&& localCellData, bool isSubStep)
+    void writeOutput(data::Solution&& localCellData,
+                     const bool       isSubStep)
     {
         OPM_TIMEBLOCK(writeOutput);
 
@@ -461,7 +484,6 @@ public:
         auto floresn = this->outputModule_->getFlows().getFloresn();
 
         if (! isSubStep || Parameters::Get<Parameters::EnableWriteAllSolutions>()) {
-
             if (localCellData.empty()) {
                 this->outputModule_->assignToSolution(localCellData);
             }
@@ -491,20 +513,31 @@ public:
                                            /* interRegFlows = */ {},
                                            flowsn,
                                            floresn);
+
             if (this->collectOnIORank_.isIORank()) {
-                this->outputModule_->assignGlobalFieldsToSolution(this->collectOnIORank_.globalCellData());
+                this->outputModule_->assignGlobalFieldsToSolution
+                    (this->collectOnIORank_.globalCellData());
             }
-        } else {
+        }
+        else {
             this->outputModule_->assignGlobalFieldsToSolution(localCellData);
         }
+
+        // ----------------------------------------------------------------------
+        //
+        // ---> Guarded parallel try/catch region for result file output.
+
+        OPM_BEGIN_PARALLEL_TRY_CATCH()
 
         if (this->collectOnIORank_.isIORank()) {
             const Scalar curTime = simulator_.time() + simulator_.timeStepSize();
             const Scalar nextStepSize = simulator_.problem().nextTimeStepSize();
-            std::optional<int> timeStepIdx;
+
+            std::optional<int> timeStepIdx; 
             if (Parameters::Get<Parameters::EnableWriteAllSolutions>()) {
                 timeStepIdx = simulator_.timeStepIndex();
             }
+
             this->doWriteOutput(reportStepNum, timeStepIdx, isSubStep,
                                 std::move(localCellData),
                                 std::move(localWellData),
@@ -520,6 +553,11 @@ public:
                                 isFlowsn, std::move(flowsn),
                                 isFloresn, std::move(floresn));
         }
+
+        OPM_END_PARALLEL_TRY_CATCH("Result file output: ",
+                                   this->simulator_.vanguard().grid().comm());
+        //
+        // <--- Guarded parallel try/catch region for result file output.
     }
 
     void beginRestart()
@@ -763,8 +801,9 @@ private:
         const auto& gridView = simulator_.vanguard().gridView();
         const bool log = this->collectOnIORank_.isIORank();
 
-        const int num_interior = detail::
-            countLocalInteriorCellsGridView(gridView);
+        const int num_interior =
+            detail::countLocalInteriorCellsGridView(gridView);
+
         this->outputModule_->
             allocBuffers(num_interior, reportStepNum,
                          isSubStep && !Parameters::Get<Parameters::EnableWriteAllSolutions>(),
@@ -809,6 +848,65 @@ private:
 
         OPM_END_PARALLEL_TRY_CATCH("EclWriter::prepareLocalCellData() failed: ",
                                    this->simulator_.vanguard().grid().comm());
+    }
+
+    void captureCO2ConcentrationVariation_SPE11()
+    {
+        OPM_TIMEBLOCK(captureCO2ConcentrationVariation);
+
+        this->outputModule_->prepareCO2ConcentrationVariation_SPE11();
+
+        auto elemCtx = ElementContext { this->simulator_ };
+
+        const auto& gridView = this->simulator_.vanguard().gridView();
+
+        // Note: This loop intentionally goes over all cells in the local
+        // grid view, including border and ghost cells.  We need to capture
+        // the CO2 mass fraction in ghost cells in order to calculate the
+        // requisite cell-valued gradients in the view's interior cells.
+        for (const auto& elem : elements(gridView)) {
+            elemCtx.updatePrimaryStencil(elem);
+            elemCtx.updatePrimaryIntensiveQuantities(/*timeIdx=*/0);
+
+            this->outputModule_->processCO2ConcentrationVariation_SPE11(elemCtx);
+        }
+
+        this->outputModule_->finaliseCO2ConcentrationVariation_SPE11
+            (gridView, this->simulator_.model().elementMapper());
+
+        // --------------------------------------------------------------------
+
+        {
+            const auto dofIdx  = 0u;
+            const auto timeIdx = 0u;
+
+            const auto& concVar = this->outputModule_
+                ->getLocalCO2ConcentrationVariation_SPE11();
+
+            auto i = typename std::vector<Scalar>::size_type{0};
+
+            this->outputModule_->prepareRegionCO2ConcentrationVariation_SPE11();
+
+            for (const auto& elem : elements(gridView, Dune::Partitions::interior)) {
+                elemCtx.updatePrimaryStencil(elem);
+                elemCtx.updatePrimaryIntensiveQuantities(timeIdx);
+
+                const auto globalDofIdx = elemCtx.globalSpaceIndex(dofIdx, timeIdx);
+
+                const auto& iq = elemCtx.intensiveQuantities(dofIdx, timeIdx);
+                const auto pv = iq.porosity().value()
+                    * this->simulator_.model().dofTotalVolume(globalDofIdx);
+
+                // Note: concVar * pv is single-point contribution to the
+                // integral for this cell--i.e., the usual finite volume
+                // approximation.
+                this->outputModule_->processRegionCO2ConcentrationVariation_SPE11
+                    (globalDofIdx, concVar[i++] * pv);
+            }
+
+            this->outputModule_->
+                finaliseRegionCO2ConcentrationVariation_SPE11(gridView.comm());
+        }
     }
 
     void captureLocalFluxData()

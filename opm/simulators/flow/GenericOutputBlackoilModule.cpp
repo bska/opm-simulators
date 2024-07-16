@@ -15,12 +15,14 @@
 
   You should have received a copy of the GNU General Public License
   along with OPM.  If not, see <http://www.gnu.org/licenses/>.
+
   Consult the COPYING file in the top-level source directory of this
   module for the precise wording of the license and the list of
   copyright holders.
 */
 
 #include <config.h>
+
 #include <opm/simulators/flow/GenericOutputBlackoilModule.hpp>
 
 #include <opm/common/OpmLog/OpmLog.hpp>
@@ -127,16 +129,16 @@ GenericOutputBlackoilModule(const EclipseState& eclState,
                             RSTConv::LocalToGlobalCellFunc globalCell,
                             std::function<bool(const unsigned)> isInterior,
                             const Parallel::Communication& comm,
-                            bool enableEnergy,
-                            bool constantTemperature,
-                            bool enableMech,
-                            bool enableSolvent,
-                            bool enablePolymer,
-                            bool enableFoam,
-                            bool enableBrine,
-                            bool enableSaltPrecipitation,
-                            bool enableExtbo,
-                            bool enableBioeffects)
+                            const bool enableEnergy,
+                            const bool constantTemperature,
+                            const bool enableMech,
+                            const bool enableSolvent,
+                            const bool enablePolymer,
+                            const bool enableFoam,
+                            const bool enableBrine,
+                            const bool enableSaltPrecipitation,
+                            const bool enableExtbo,
+                            const bool enableBioeffects)
     : eclState_(eclState)
     , schedule_(schedule)
     , summaryState_(summaryState)
@@ -275,19 +277,15 @@ calc_initial_inplace(const Parallel::Communication& comm)
 
 template<class FluidSystem>
 Inplace GenericOutputBlackoilModule<FluidSystem>::
-calc_inplace(std::map<std::string, double>& miscSummaryData,
+calc_inplace(std::map<std::string, double>&              miscSummaryData,
              std::map<std::string, std::vector<double>>& regionData,
-             const Parallel::Communication& comm)
+             const Parallel::Communication&              comm)
 {
     auto inplace = this->accumulateRegionSums(comm);
 
-    if (comm.rank() != 0)
-        return inplace;
-
-    updateSummaryRegionValues(inplace,
-                              miscSummaryData,
-                              regionData);
-
+    if (comm.rank() == 0) {
+        this->updateSummaryRegionValues(inplace, miscSummaryData, regionData);
+    }
 
     return inplace;
 }
@@ -509,16 +507,15 @@ setRestart(const data::Solution& sol,
         saturation_[oilPhaseIdx][elemIdx] = so;
     }
 
-    auto assign = [elemIdx, globalDofIndex, &sol](const std::string& name,
-                                                  ScalarBuffer& data)
-
+    auto assign = [elemIdx, globalDofIndex, &sol]
+        (const std::string& name, ScalarBuffer& data)
     {
         if (!data.empty() && sol.has(name)) {
             data[elemIdx] = sol.data<double>(name)[globalDofIndex];
         }
     };
 
-    const auto fields = std::array{
+    const auto fields = std::array {
         std::pair{"FOAM",     &cFoam_},
         std::pair{"PERMFACT", &permFact_},
         std::pair{"POLYMER",  &cPolymer_},
@@ -552,9 +549,9 @@ setRestart(const data::Solution& sol,
 template<class FluidSystem>
 typename GenericOutputBlackoilModule<FluidSystem>::ScalarBuffer
 GenericOutputBlackoilModule<FluidSystem>::
-regionSum(const ScalarBuffer& property,
-          const std::vector<int>& regionId,
-          std::size_t maxNumberOfRegions,
+regionSum(const ScalarBuffer&            property,
+          const std::vector<int>&        regionId,
+          const std::size_t              maxNumberOfRegions,
           const Parallel::Communication& comm)
 {
     ScalarBuffer totals(maxNumberOfRegions, 0.0);
@@ -563,16 +560,15 @@ regionSum(const ScalarBuffer& property,
         return totals;
     }
 
-    // the regionId contains the ghost cells
-    // the property does not contain the ghostcells
-    // This code assumes that that the ghostcells are
-    // added after the interior cells
-    // OwnerCellsFirst = True
+    // the regionId contains the ghost cells the property does not contain
+    // the ghostcells This code assumes that that the ghostcells are added
+    // after the interior cells OwnerCellsFirst = True
     assert(regionId.size() >= property.size());
     for (std::size_t j = 0; j < property.size(); ++j) {
         const int regionIdx = regionId[j] - 1;
-        // the cell is not attributed to any region. ignore it!
+
         if (regionIdx < 0) {
+            // the cell is not attributed to any region. ignore it!
             continue;
         }
 
@@ -980,7 +976,9 @@ int GenericOutputBlackoilModule<FluidSystem>::
 regionMax(const std::vector<int>& region,
           const Parallel::Communication& comm)
 {
-    const auto max_value = region.empty() ? 0 : *std::ranges::max_element(region);
+    const auto max_value = region.empty()
+        ? 0 : *std::ranges::max_element(region);
+
     return comm.max(max_value);
 }
 
@@ -993,11 +991,14 @@ update(Inplace& inplace,
        const ScalarBuffer& values)
 {
     double sum = 0.0;
+
     for (std::size_t region_number = 0; region_number < ntFip; ++region_number) {
         const auto rval = static_cast<double>(values[region_number]);
+
         inplace.add(region_name, phase, region_number + 1, rval);
         sum += rval;
     }
+
     inplace.add(phase, sum);
 }
 
@@ -1051,16 +1052,15 @@ accumulateRegionSums(const Parallel::Communication& comm)
 
 template<class FluidSystem>
 typename GenericOutputBlackoilModule<FluidSystem>::Scalar
-GenericOutputBlackoilModule<FluidSystem>::
-sum(const ScalarBuffer& v)
+GenericOutputBlackoilModule<FluidSystem>::sum(const ScalarBuffer& v)
 {
     return std::accumulate(v.begin(), v.end(), Scalar{0});
 }
 
 template<class FluidSystem>
 void GenericOutputBlackoilModule<FluidSystem>::
-updateSummaryRegionValues(const Inplace& inplace,
-                          std::map<std::string, double>& miscSummaryData,
+updateSummaryRegionValues(const Inplace&                              inplace,
+                          std::map<std::string, double>&              miscSummaryData,
                           std::map<std::string, std::vector<double>>& regionData) const
 {
     // The field summary vectors should only use the FIPNUM based region sum.
@@ -1136,6 +1136,25 @@ updateSummaryRegionValues(const Inplace& inplace,
         for (const auto& node : this->summaryConfig_.keywords("RHPV*")) {
             regionData[node.keyword()] =
                 get_vector(node, Inplace::Phase::HydroCarbonPV);
+        }
+    }
+
+    // Special purpose region-level measure of total CO2 concentration
+    // variation for the 11th SPE comparative solutions project.
+    if (this->needCO2ConcentrationVariation_SPE11()) {
+        const auto& regs = this->regionConcVariation_SPE11_->regions();
+        const auto nreg = regs.size();
+
+        const auto vectorBase = std::string { "RCVAR" };
+
+        for (auto reg = 0*nreg; reg < nreg; ++reg) {
+            const auto vector = (regs[reg] == "NUM") // FIPNUM
+                ? vectorBase : vectorBase + regs[reg];
+
+            const auto concVarSpan =
+                this->regionConcVariation_SPE11_->getConcVariation(reg);
+
+            regionData.try_emplace(vector, concVarSpan.first, concVarSpan.second);
         }
     }
 }
