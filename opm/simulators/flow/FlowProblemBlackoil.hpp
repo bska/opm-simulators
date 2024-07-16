@@ -342,6 +342,7 @@ public:
         }
 
         const auto& initconfig = eclState.getInitConfig();
+
         this->tracerModel_.init(initconfig.restartRequested());
         if (initconfig.restartRequested()) {
             this->readEclRestartSolution_();
