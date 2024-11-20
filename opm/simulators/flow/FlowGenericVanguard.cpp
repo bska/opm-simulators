@@ -424,6 +424,10 @@ void FlowGenericVanguard::registerParameters_()
     Parameters::Register<Parameters::OwnerCellsFirst>
         ("Order cells owned by rank before ghost/overlap cells.");
 #if HAVE_MPI
+    Parameters::Register<Parameters::AddCorners>
+        ("Add corners to partion.");
+    Parameters::Register<Parameters::NumOverlap>
+        ("Numbers of layers overlap in parallel partition");
     Parameters::Register<Parameters::PartitionMethod>
         ("Choose partitioning strategy: 0=simple, 1=Zoltan, 2=METIS, 3=Zoltan with all cells of well represented by one vertex.");
     Parameters::Register<Parameters::SerialPartitioning>
