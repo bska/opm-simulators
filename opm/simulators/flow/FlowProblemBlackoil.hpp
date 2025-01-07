@@ -440,14 +440,14 @@ public:
         // after the solution is updated, the values in output module needs also updated
         this->eclWriter()->mutableOutputModule().invalidateLocalData();
 
-        const bool isSubStep = !this->simulator().episodeWillBeOver();
-
         // For CpGrid with LGRs, ecl/vtk output is not supported yet.
         const auto& grid = this->simulator().vanguard().gridView().grid();
 
         using GridType = std::remove_cv_t<std::remove_reference_t<decltype(grid)>>;
         constexpr bool isCpGrid = std::is_same_v<GridType, Dune::CpGrid>;
         if (!isCpGrid || (grid.maxLevel() == 0)) {
+            const auto isSubStep = !this->simulator().episodeWillBeOver();
+
             this->eclWriter_->evalSummaryState(isSubStep);
         }
 
