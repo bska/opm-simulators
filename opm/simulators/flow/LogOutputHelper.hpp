@@ -87,8 +87,12 @@ public:
     //! \param[in] changedWells List of wells whose structure changed at
     //! this time.
     //!
+    //! \param[in] changedWells Well lists whose contents changed at this
+    //! time.
+    //!
     //! \param[in] reportStepNum Report step index (1-based).
     void wellSpecification(const std::vector<std::string>& changedWells,
+                           const std::vector<std::string>& changedWellLists,
                            const std::size_t               reportStepNum) const;
 
     void timeStamp(const std::string& lbl,
