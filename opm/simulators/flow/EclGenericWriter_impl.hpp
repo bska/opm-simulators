@@ -633,7 +633,7 @@ evalSummary(const int                                            reportStepNum,
             const std::map<std::string, double>&                 miscSummaryData,
             const std::map<std::string, std::vector<double>>&    regionData,
             const Inplace&                                       inplace,
-            const std::optional<Inplace>&                        initialInPlace,
+            const Inplace*                                       initialInPlace,
             const InterRegFlowMap&                               interRegFlows,
             SummaryState&                                        summaryState,
             UDQState&                                            udqState)
@@ -657,19 +657,24 @@ evalSummary(const int                                            reportStepNum,
             ? this->collectOnIORank_.globalAquiferData()
             : localAquiferData;
 
-        summary.eval(summaryState,
-                     reportStepNum,
-                     curTime,
-                     wellData,
-                     wbpData,
-                     groupAndNetworkData,
-                     miscSummaryData,
-                     initialInPlace,
-                     inplace,
-                     regionData,
-                     blockData,
-                     aquiferData,
-                     getInterRegFlowsAsMap(interRegFlows));
+        auto values = out::Summary::DynamicSimulatorState{};
+
+        values.well_solution = &wellData;
+        values.wbp = &wbpData;
+        values.group_and_nwrk_solution = &groupAndNetworkData;
+        values.single_values = &miscSummaryData;
+
+        values.inplace.current = &inplace;
+        values.inplace.initial = initialInPlace;
+
+        values.region_values = &regionData;
+        values.block_values = &blockData;
+        values.aquifer_values = &aquiferData;
+
+        const auto interreg_flows = getInterRegFlowsAsMap(interRegFlows);
+        values.interreg_flows = &interreg_flows;
+
+        summary.eval(reportStepNum, curTime, values, summaryState);
 
         // Off-by-one-fun: The reportStepNum argument corresponds to the
         // report step these results will be written to, whereas the

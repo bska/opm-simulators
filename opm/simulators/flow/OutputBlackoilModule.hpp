@@ -352,7 +352,7 @@ public:
 
             this->logOutput_.timeStamp("BALANCE", elapsed, reportStepNum, currentDate);
 
-            const auto& initial_inplace = this->initialInplace().value();
+            const auto& initial_inplace = *this->initialInplace();
             this->logOutput_.fip(inplace, initial_inplace, "");
 
             if (fipc.output(FIPConfig::OutputField::FIPNUM)) {
@@ -394,7 +394,7 @@ public:
 
             this->logOutput_.csv_header(csv_stream);
 
-            const auto& initial_inplace = this->initialInplace().value();
+            const auto& initial_inplace = *this->initialInplace();
 
             this->logOutput_.fip_csv(csv_stream, initial_inplace, "FIPNUM");
 
