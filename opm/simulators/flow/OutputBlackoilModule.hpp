@@ -3048,7 +3048,7 @@ private:
                          }
                     },
                 };
-                handlers.insert(mech_handlers.begin(), mech_handlers.end(), handlers.end());
+                handlers.insert(handlers.end(),mech_handlers.begin(), mech_handlers.end());
             }
         }
 
