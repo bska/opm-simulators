@@ -32,6 +32,7 @@
 
 #include <array>
 #include <cstddef>
+#include <functional>
 #include <map>
 #include <string>
 #include <vector>
@@ -47,7 +48,7 @@ class MechContainer
 
 public:
     void allocate(const std::size_t bufferSize,
-                  std::map<std::string, int>& rstKeywords);
+                  std::map<std::string, int, std::less<>>& rstKeywords);
 
     void assignDisplacement(const unsigned globalDofIdx,
                             const Dune::FieldVector<Scalar,3>& disp);
