@@ -21,6 +21,7 @@
 */
 
 #include <config.h>
+
 #include <opm/simulators/flow/CompositionalContainer.hpp>
 
 #include <opm/material/fluidsystems/GenericOilGasWaterFluidSystem.hpp>
@@ -28,6 +29,8 @@
 #include <opm/output/data/Solution.hpp>
 
 #include <algorithm>
+#include <map>
+#include <functional>
 #include <tuple>
 
 #include <fmt/format.h>
@@ -36,8 +39,8 @@ namespace Opm {
 
 template<class FluidSystem>
 void CompositionalContainer<FluidSystem>::
-allocate(const unsigned bufferSize,
-         std::map<std::string, int>& rstKeywords)
+allocate(const unsigned                           bufferSize,
+         std::map<std::string, int, std::less<>>& rstKeywords)
 {
     if (auto& zmf = rstKeywords["ZMF"]; zmf > 0) {
         this->allocated_ = true;

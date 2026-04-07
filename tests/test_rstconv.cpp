@@ -104,8 +104,8 @@ BOOST_AUTO_TEST_CASE(RstConvTest)
 #endif
     const auto& cc = Dune::MPIHelper::getCommunication();
 
-    Opm::RSTConfig rst;
-    rst.keywords["CONV"] = sample.N;
+    Opm::RSTConfig rst{};
+    rst.setMnemonicForTesting("CONV", sample.N);
 
     std::vector<int> cellMapping(10);
     std::iota(cellMapping.begin(), cellMapping.end(), cc.rank()*10);

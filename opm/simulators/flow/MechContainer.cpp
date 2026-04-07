@@ -37,7 +37,7 @@ namespace Opm {
 template<class Scalar>
 void MechContainer<Scalar>::
 allocate(const std::size_t bufferSize,
-         std::map<std::string, int>& rstKeywords)
+         std::map<std::string, int, std::less<>>& rstKeywords)
 {
     this->potentialForce_.resize(bufferSize, 0.0);
     rstKeywords["MECHPOTF"] = 0;
