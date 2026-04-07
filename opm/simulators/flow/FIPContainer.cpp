@@ -41,7 +41,7 @@ FIPContainer<FluidSystem>::
 allocate(const std::size_t bufferSize,
          const SummaryConfig& summaryConfig,
          const bool forceAlloc,
-         std::map<std::string, int>& rstKeywords)
+         std::map<std::string, int, std::less<>>& rstKeywords)
 {
     using namespace std::string_literals;
 

@@ -30,8 +30,10 @@
 
 #include <array>
 #include <cstddef>
+#include <functional>
 #include <map>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace Opm::data {
@@ -57,7 +59,7 @@ public:
     bool allocate(const std::size_t bufferSize,
                   const SummaryConfig& summaryConfig,
                   const bool forceAlloc,
-                  std::map<std::string, int>& rstKeywords);
+                  std::map<std::string, int, std::less<>>& rstKeywords);
 
     void add(const Inplace::Phase phase);
 
