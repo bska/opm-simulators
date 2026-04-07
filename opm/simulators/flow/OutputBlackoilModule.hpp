@@ -792,7 +792,7 @@ public:
 protected:
     //! \brief Allocate the buffers of the quantities only the black-oil
     //!        formulation produces, keyed on their restart mnemonics.
-    void allocFormulationBuffers(std::map<std::string, int>& rstKeywords,
+    void allocFormulationBuffers(std::map<std::string, int, std::less<>>& rstKeywords,
                                  const unsigned bufferSize) override
     {
         // RS and RV are allocated whenever the fluid system supports them,
