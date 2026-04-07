@@ -42,15 +42,16 @@ void RSTConv::init(const std::size_t numCells,
                    const RSTConfig& rst_config,
                    const std::array<int,6>& compIdx)
 {
-    const auto kw = rst_config.keywords.find("CONV");
-    if (kw == rst_config.keywords.end()) {
+    const auto conv = rst_config.getMnemonic("CONV");
+
+    if (!conv.has_value()) {
         N_ = 0;
         cnv_X_.clear();
         conv_new_.clear();
         return;
     }
 
-    const int requestedN = kw->second;
+    const int requestedN = *conv;
     const int maxN = static_cast<int>(numCells);
     if (requestedN > maxN && comm_.rank() == 0) {
         const auto msg = fmt::format(

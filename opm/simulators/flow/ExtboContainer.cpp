@@ -21,6 +21,7 @@
 */
 
 #include <config.h>
+
 #include <opm/simulators/flow/ExtboContainer.hpp>
 
 #include <opm/common/OpmLog/OpmLog.hpp>
@@ -31,6 +32,7 @@
 
 #include <algorithm>
 #include <array>
+#include <functional>
 #include <string>
 #include <tuple>
 #include <utility>
@@ -59,7 +61,7 @@ phaseSolventMassFractions(const PhaseFractionInput& cell)
 template<class Scalar>
 void ExtboContainer<Scalar>::
 allocate(const unsigned bufferSize,
-         std::map<std::string, int>& rstKeywords,
+         std::map<std::string, int, std::less<>>& rstKeywords,
          const bool extendedOutput,
          const bool log)
 {
@@ -75,18 +77,20 @@ allocate(const unsigned bufferSize,
         warnedUnwritten_ = true;
     }
 
-    X_volume_.resize(bufferSize, 0.0);
-    Y_volume_.resize(bufferSize, 0.0);
-    Z_fraction_.resize(bufferSize, 0.0);
-    mFracOil_.resize(bufferSize, 0.0);
-    mFracGas_.resize(bufferSize, 0.0);
-    mFracCo2_.resize(bufferSize, 0.0);
     const auto phaseFractionSize = [bufferSize, extendedOutput](const bool requested)
     { return requested && extendedOutput ? bufferSize : 0u; };
-    oilPhaseSolventMassFraction_.resize(phaseFractionSize(requestOilMassFraction), 0.0);
-    gasPhaseSolventMassFraction_.resize(phaseFractionSize(requestGasMassFraction), 0.0);
 
-    allocated_ = true;
+    this->X_volume_.resize(bufferSize, 0.0);
+    this->Y_volume_.resize(bufferSize, 0.0);
+    this->Z_fraction_.resize(bufferSize, 0.0);
+    this->mFracOil_.resize(bufferSize, 0.0);
+    this->mFracGas_.resize(bufferSize, 0.0);
+    this->mFracCo2_.resize(bufferSize, 0.0);
+
+    this->oilPhaseSolventMassFraction_.resize(phaseFractionSize(requestOilMassFraction), 0.0);
+    this->gasPhaseSolventMassFraction_.resize(phaseFractionSize(requestGasMassFraction), 0.0);
+
+    this->allocated_ = true;
 }
 
 template<class Scalar>

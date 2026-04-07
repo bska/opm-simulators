@@ -28,6 +28,7 @@ This file is part of the Open Porous Media project (OPM).
 
 #include <array>
 #include <cstddef>
+#include <functional>
 #include <map>
 #include <string>
 #include <vector>
@@ -47,7 +48,7 @@ class TpsaContainer
 
 public:
     void allocate(const std::size_t bufferSize,
-                  std::map<std::string, int>& rstKeywords);
+                  std::map<std::string, int, std::less<>>& rstKeywords);
 
     void assignRotation(const unsigned globalDofIdx,
                         const Dune::FieldVector<Scalar, 3>& rotation);
