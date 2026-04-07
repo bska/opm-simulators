@@ -318,14 +318,14 @@ protected:
                                 bool enableBioeffects,
                                 bool enableGeochemistry);
 
-    void doAllocBuffers(unsigned bufferSize,
-                        unsigned reportStepNum,
-                        const bool substep,
-                        const bool log,
-                        const bool isRestart,
-                        const EclHysteresisConfig* hysteresisConfig,
-                        unsigned numOutputNnc = 0,
-                        std::map<std::string, int> rstKeywords = {});
+    void doAllocBuffers(unsigned                                bufferSize,
+                        unsigned                                reportStepNum,
+                        const bool                              substep,
+                        const bool                              log,
+                        const bool                              isRestart,
+                        const EclHysteresisConfig*              hysteresisConfig,
+                        unsigned                                numOutputNnc = 0,
+                        std::map<std::string, int, std::less<>> rstKeywords = {});
 
     void makeRegionSum(Inplace& inplace,
                        const std::string& region_name,
