@@ -63,7 +63,7 @@ public:
                   const SummaryConfig& summaryConfig,
                   const unsigned numOutputNnc,
                   const bool allocRestart,
-                  std::map<std::string, int>& rstKeywords);
+                  std::map<std::string, int, std::less<>>& rstKeywords);
 
     void assignFlores(const unsigned globalDofIdx,
                       const int faceId,

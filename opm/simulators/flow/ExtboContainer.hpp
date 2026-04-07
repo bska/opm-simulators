@@ -26,6 +26,7 @@
 #ifndef OPM_EXTBO_CONTAINER_HPP
 #define OPM_EXTBO_CONTAINER_HPP
 
+#include <functional>
 #include <map>
 #include <string>
 #include <utility>
@@ -62,7 +63,7 @@ public:
     phaseSolventMassFractions(const PhaseFractionInput& cell);
 
     void allocate(const unsigned bufferSize,
-                  std::map<std::string, int>& rstKeywords,
+                  std::map<std::string, int, std::less<>>& rstKeywords,
                   const bool extendedOutput,
                   const bool log);
 
