@@ -111,14 +111,12 @@ FlowsContainer(const Schedule& schedule,
     anyFlores_ = std::ranges::any_of(schedule,
                                      [](const auto& block)
                                      {
-                                         const auto& rstkw = block.rst_config().keywords;
-                                         return rstkw.find("FLORES") != rstkw.end();
+                                         return block.rst_config().getMnemonic("FLORES").has_value();
                                      });
     anyFlows_ = std::ranges::any_of(schedule,
                                     [](const auto& block)
                                     {
-                                        const auto& rstkw = block.rst_config().keywords;
-                                        return rstkw.find("FLOWS") != rstkw.end();
+                                        return block.rst_config().getMnemonic("FLOWS").has_value();
                                     });
 
     // Check for any BVEL[G|O|W][I|J|K][|-] summary keys
@@ -174,7 +172,7 @@ allocate(const std::size_t bufferSize,
          const SummaryConfig& summaryConfig,
          const unsigned numOutputNnc,
          const bool allocRestart,
-         std::map<std::string, int>& rstKeywords)
+         std::map<std::string, int, std::less<>>& rstKeywords)
 {
     using namespace std::string_literals;
     using Dir = FaceDir::DirEnum;
