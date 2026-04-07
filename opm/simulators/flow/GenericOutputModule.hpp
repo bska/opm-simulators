@@ -346,7 +346,7 @@ protected:
 
     /// Resize \p buffer when the restart keyword \p kw is requested, and mark
     /// the request as handled.
-    static bool allocBufferIfRequested(std::map<std::string, int>& rstKeywords,
+    static bool allocBufferIfRequested(std::map<std::string, int, std::less<>>& rstKeywords,
                                        unsigned bufferSize,
                                        std::vector<Scalar>& buffer,
                                        std::string_view kw,
@@ -387,19 +387,19 @@ protected:
                         bool enableBioeffects,
                         bool enableGeochemistry);
 
-    void doAllocBuffers(unsigned bufferSize,
-                        unsigned reportStepNum,
-                        const bool substep,
-                        const bool log,
-                        const bool isRestart,
-                        const EclHysteresisConfig* hysteresisConfig,
-                        unsigned numOutputNnc = 0,
-                        std::map<std::string, int> rstKeywords = {});
+    void doAllocBuffers(unsigned                                bufferSize,
+                        unsigned                                reportStepNum,
+                        const bool                              substep,
+                        const bool                              log,
+                        const bool                              isRestart,
+                        const EclHysteresisConfig*              hysteresisConfig,
+                        unsigned                                numOutputNnc = 0,
+                        std::map<std::string, int, std::less<>> rstKeywords = {});
 
     /// Allocate the buffers a derived module owns.  Called while the restart
     /// keywords are being handled, so that a keyword consumed here is marked
     /// as handled before the unhandled-keyword check.
-    virtual void allocFormulationBuffers(std::map<std::string, int>& rstKeywords,
+    virtual void allocFormulationBuffers(std::map<std::string, int, std::less<>>& rstKeywords,
                                          unsigned bufferSize) = 0;
 
     void makeRegionSum(Inplace& inplace,
