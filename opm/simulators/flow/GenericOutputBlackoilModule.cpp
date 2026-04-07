@@ -594,14 +594,14 @@ regionSum(const ScalarBuffer& property,
 
 template<class FluidSystem>
 void GenericOutputBlackoilModule<FluidSystem>::
-doAllocBuffers(const unsigned bufferSize,
-               const unsigned reportStepNum,
-               const bool     substep,
-               const bool     log,
-               const bool     isRestart,
-               const EclHysteresisConfig* hysteresisConfig,
-               const unsigned numOutputNnc,
-               std::map<std::string, int> rstKeywords)
+doAllocBuffers(const unsigned                          bufferSize,
+               const unsigned                          reportStepNum,
+               const bool                              substep,
+               const bool                              log,
+               const bool                              isRestart,
+               const EclHysteresisConfig*              hysteresisConfig,
+               const unsigned                          numOutputNnc,
+               std::map<std::string, int, std::less<>> rstKeywords)
 {
     if (rstKeywords.empty()) {
         rstKeywords = schedule_.rst_keywords(reportStepNum);

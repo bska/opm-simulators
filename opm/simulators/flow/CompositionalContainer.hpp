@@ -51,7 +51,7 @@ class CompositionalContainer
 
 public:
     void allocate(const unsigned bufferSize,
-                  std::map<std::string, int>& rstKeywords);
+                  std::map<std::string, int, std::less<>>& rstKeywords);
 
     using AssignFunction = std::function<Scalar(const unsigned)>;
 
