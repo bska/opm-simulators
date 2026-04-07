@@ -60,7 +60,7 @@ public:
     /// for passes that will write restart data because filling the buffer
     /// requires a nonlinear solve for each single-phase cell.
     void allocate(const unsigned bufferSize,
-                  std::map<std::string, int>& rstKeywords,
+                  std::map<std::string, int, std::less<>>& rstKeywords,
                   RestartOutput restartOutput);
 
     using AssignFunction = std::function<Scalar(const unsigned)>;
