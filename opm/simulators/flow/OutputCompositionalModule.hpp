@@ -758,7 +758,7 @@ public:
 
 protected:
     //! \brief Allocate compositional relative-permeability buffers.
-    void allocFormulationBuffers(std::map<std::string, int>& rstKeywords,
+    void allocFormulationBuffers(std::map<std::string, int, std::less<>>& rstKeywords,
                                  const unsigned bufferSize) override
     {
         // Name each phase explicitly: the compositional phase ordering is not
