@@ -28,6 +28,8 @@
 #include <opm/input/eclipse/Units/UnitSystem.hpp>
 #include <opm/output/data/Solution.hpp>
 
+#include <functional>
+
 namespace Opm
 {
 
@@ -35,7 +37,7 @@ template <class Scalar>
 void
 TpsaContainer<Scalar>::
 allocate(const std::size_t bufferSize,
-         std::map<std::string, int>& rstKeywords)
+         std::map<std::string, int, std::less<>>& rstKeywords)
 {
     this->solidPressure_.resize(bufferSize, 0.0);
     rstKeywords["SPRES"] = 0;

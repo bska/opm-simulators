@@ -21,6 +21,7 @@
 */
 
 #include <config.h>
+
 #include <opm/simulators/flow/CompositionalContainer.hpp>
 
 #include <opm/material/constraintsolvers/SaturationPressure.hpp>
@@ -29,6 +30,8 @@
 #include <opm/output/data/Solution.hpp>
 
 #include <algorithm>
+#include <functional>
+#include <map>
 #include <optional>
 #include <tuple>
 
@@ -38,9 +41,9 @@ namespace Opm {
 
 template<class FluidSystem>
 void CompositionalContainer<FluidSystem>::
-allocate(const unsigned bufferSize,
-         std::map<std::string, int>& rstKeywords,
-         const RestartOutput restartOutput)
+allocate(const unsigned                           bufferSize,
+         std::map<std::string, int, std::less<>>& rstKeywords,
+         const RestartOutput                      restartOutput)
 {
     if (auto& zmf = rstKeywords["ZMF"]; zmf > 0) {
         this->allocated_ = true;

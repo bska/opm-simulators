@@ -32,6 +32,7 @@
 
 #include <opm/output/data/Solution.hpp>
 
+#include <functional>
 #include <map>
 #include <memory>
 #include <string>
@@ -56,7 +57,7 @@ Container::PhaseFractionInput twoPhaseCell()
     };
 }
 
-std::map<std::string, int> requests(const int oil, const int gas)
+std::map<std::string, int, std::less<>> requests(const int oil, const int gas)
 {
     return {{"SOLVMFO", oil}, {"SOLVMFG", gas}};
 }
