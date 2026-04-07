@@ -31,6 +31,7 @@
 
 #include <algorithm>
 #include <array>
+#include <functional>
 #include <map>
 #include <string>
 #include <vector>
@@ -60,7 +61,7 @@ BOOST_GLOBAL_FIXTURE(Fixture);
 BOOST_AUTO_TEST_CASE(SaturationPressureRequiresRestartOutput)
 {
     Container container;
-    std::map<std::string, int> keywords{{"PSAT", 1}};
+    std::map<std::string, int, std::less<>> keywords{{"PSAT", 1}};
     container.allocate(2, keywords, RestartOutput::Disabled);
     BOOST_CHECK(!container.saturationPressureAllocated());
     BOOST_CHECK(!container.saturationPressureRequested());
@@ -104,7 +105,7 @@ BOOST_AUTO_TEST_CASE(SaturationPressureRequiresRestartOutput)
 BOOST_AUTO_TEST_CASE(DisabledSaturationPressureClearsPreviousRequest)
 {
     Container container;
-    std::map<std::string, int> keywords{{"PSAT", 1}};
+    std::map<std::string, int, std::less<>> keywords{{"PSAT", 1}};
     container.allocate(2, keywords, RestartOutput::Enabled);
     BOOST_REQUIRE(container.saturationPressureAllocated());
     keywords["PSAT"] = 0;
@@ -116,7 +117,7 @@ BOOST_AUTO_TEST_CASE(DisabledSaturationPressureClearsPreviousRequest)
 BOOST_AUTO_TEST_CASE(SaturationPressureRequestIsIndependentOfLocalBufferSize)
 {
     Container container;
-    std::map<std::string, int> keywords{{"PSAT", 1}};
+    std::map<std::string, int, std::less<>> keywords{{"PSAT", 1}};
     container.allocate(0, keywords, RestartOutput::Enabled);
 
     BOOST_CHECK(container.saturationPressureRequested());
