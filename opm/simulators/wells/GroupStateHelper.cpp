@@ -2598,33 +2598,34 @@ GroupStateHelper<Scalar, IndexTraits>::satelliteInjectionRate_(const ScheduleSta
 // - Returns the satellite production rate for the given rate component from GSATPROD data.
 template <typename Scalar, typename IndexTraits>
 Scalar
-GroupStateHelper<Scalar, IndexTraits>::satelliteProductionRate_(
-    const ScheduleState& sched,
-    const Group& group,
-    const GSatProd::GSatProdGroupProp::Rate rate_comp,
-    bool res_rates) const
+GroupStateHelper<Scalar, IndexTraits>::
+satelliteProductionRate_(const ScheduleState& sched,
+                         const Group&         group,
+                         const GSatProd::Rate rate_comp,
+                         const bool           res_rates) const
 {
-    Scalar rate = 0.0;
-    if (group.hasSatelliteProduction()) {
-        const auto& gsat_prod = sched.gsatprod();
-        if (!res_rates) {
-            rate = gsat_prod.get(group.name(), this->summary_state_).rate[rate_comp];
-        }
-        // We don't support reservoir rates for satellite production groups
+    if (res_rates || !group.hasSatelliteProduction()) {
+        // Note: We explicitly exclude reservoir condition production rates
+        // ("res_rates") since we don't support those for satellite groups.
+        return Scalar{};
     }
-    return rate;
+
+    const auto gsrate = sched.satelliteProduction(group.name())
+        .getRate(rate_comp, this->summary_state_);
+
+    return static_cast<Scalar>(gsrate);
 }
 
 // Called from getSatelliteRate_().
 // - Maps an active phase index to the corresponding GSatProd rate component enum.
 template <typename Scalar, typename IndexTraits>
-std::optional<GSatProd::GSatProdGroupProp::Rate>
+std::optional<GSatProd::Rate>
 GroupStateHelper<Scalar, IndexTraits>::selectRateComponent_(const int phase_pos) const
 {
     // TODO: this function can be wrong, phase_pos is not used anymore, this function requries checking and
     // refactoring.
     const auto& pu = this->phase_usage_info_;
-    using Rate = GSatProd::GSatProdGroupProp::Rate;
+    using Rate = GSatProd::Rate;
 
     for (const auto& [phase, rate_comp] : std::array {std::pair {IndexTraits::waterPhaseIdx, Rate::Water},
                                                       std::pair {IndexTraits::oilPhaseIdx, Rate::Oil},

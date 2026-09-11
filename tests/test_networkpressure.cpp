@@ -42,11 +42,14 @@
 #include <algorithm>
 #include <cstddef>
 #include <filesystem>
-#include <memory>
-#include <map>
-#include <sstream>
 #include <limits>
+#include <map>
+#include <memory>
+#include <sstream>
+#include <optional>
+#include <stdexcept>
 #include <string>
+#include <string_view>
 #include <vector>
 
 using namespace Opm;
@@ -197,13 +200,12 @@ struct MockWellModel
             }
             bool hasSatelliteProduction() const { return false; }
         };
-        struct MockGSatProdValue { std::vector<double> rate {0.0}; };
         struct MockGSatProd
         {
-            template <typename SummaryState>
-            MockGSatProdValue get(const std::string&, const SummaryState&) const { return {}; }
+            template <typename GSatProdRateType, typename SummaryState>
+            double getRate(const GSatProdRateType, const SummaryState&) const { return 0.0; }
         };
-        struct MockScheduleStep { MockGSatProd gsatprod() const { return {}; } };
+        struct MockScheduleStep { MockGSatProd satelliteProduction(std::string_view) const { return {}; } };
         const MockGroup& getGroup(const std::string&, int) const
         {
             static const MockGroup group {};

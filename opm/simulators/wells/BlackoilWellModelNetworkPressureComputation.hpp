@@ -22,8 +22,10 @@
 
 #include <opm/common/TimingMacros.hpp>
 
+#include <opm/input/eclipse/Schedule/Group/GSatProd.hpp>
 #include <opm/input/eclipse/Schedule/Network/ExtNetwork.hpp>
 #include <opm/input/eclipse/Schedule/Schedule.hpp>
+#include <opm/input/eclipse/Schedule/ScheduleState.hpp>
 #include <opm/input/eclipse/Schedule/VFPProdTable.hpp>
 
 #include <opm/output/data/Groups.hpp>
@@ -256,8 +258,12 @@ private:
         // Only add satellite production once for parallel runs
         // (i.e. add after communication)
         if (group.hasSatelliteProduction()) {
-            const auto& gsat_prod = well_model_.schedule()[report_step_idx_].gsatprod().get(node, well_model_.summaryState());
-            alq += gsat_prod.rate[GSatProd::GSatProdGroupProp::Rate::GLift];
+            const auto gsrate = this->well_model_
+                .schedule()[this->report_step_idx_]
+                .satelliteProduction(node)
+                .getRate(GSatProd::Rate::GLift, this->well_model_.summaryState());
+
+            alq += static_cast<Scalar>(gsrate);
         }
 
         rates[IndexTraits::gasPhaseIdx] += alq;
