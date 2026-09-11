@@ -658,10 +658,10 @@ private:
 
     Scalar satelliteProductionRate_(const ScheduleState& sched,
                                     const Group& group,
-                                    const GSatProd::GSatProdGroupProp::Rate rate_comp,
+                                    const GSatProd::Rate rate_comp,
                                     bool res_rates) const;
 
-    std::optional<GSatProd::GSatProdGroupProp::Rate> selectRateComponent_(const int phase_pos) const;
+    std::optional<GSatProd::Rate> selectRateComponent_(const int phase_pos) const;
 
     //! \brief Subtract other-phase reservoir injection rates from a base rate.
     //!
