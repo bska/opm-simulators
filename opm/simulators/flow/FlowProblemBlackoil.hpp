@@ -322,24 +322,42 @@ public:
     {
         FlowProblemType::finishInit();
 
-        auto& simulator = this->simulator();
-        const bool transmissibilitiesFinished =
-            this->prepareTransmissibilityOutput_(*eclWriter_, enableEclOutput_);
+        const auto transmissibilitiesFinished =
+            this->prepareTransmissibilityOutput_
+            (*this->eclWriter_, this->enableEclOutput_);
 
+        auto& simulator = this->simulator();
         const auto& eclState = simulator.vanguard().eclState();
-        const auto& schedule = simulator.vanguard().schedule();
+
         this->initializeSimulatorTime_();
 
-        // conserve inner energy instead of enthalpy if TEMP is used
-        // or THERMAL and parameter ConserveInnerEnergyThermal is true (default false)
-        bool isThermal = eclState.getSimulationConfig().isThermal();
-        bool isTemp = eclState.getSimulationConfig().isTemp();
-        bool conserveInnerEnergy = isTemp || (isThermal && Parameters::Get<Parameters::ConserveInnerEnergyThermal>());
-        FluidSystem::setEnergyEqualEnthalpy(conserveInnerEnergy);
+        {
+            // Conserve inner energy instead of enthalpy if TEMP is used or
+            // THERMAL and parameter ConserveInnerEnergyThermal is true (default
+            // false)
+            const auto conserveInnerEnergy = eclState.getSimulationConfig().isTemp() ||
+                (Parameters::Get<Parameters::ConserveInnerEnergyThermal>() &&
+                 eclState.getSimulationConfig().isThermal());
+
+            FluidSystem::setEnergyEqualEnthalpy(conserveInnerEnergy);
+        }
 
         this->initializeModelProperties_();
 
-        // write the static output files (EGRID, INIT)
+        const auto& initconfig = eclState.getInitConfig();
+        this->tracerModel_.init(initconfig.restartRequested());
+
+        if (initconfig.restartRequested()) {
+            this->readEclRestartSolution_();
+        }
+        else {
+            this->readInitialCondition_();
+        }
+
+        this->temperatureModel_.init();
+        this->tracerModel_.prepareTracerBatches();
+
+        // Write the static output files (EGRID, INIT)
         if (enableEclOutput_) {
             this->eclWriter_->writeInit();
         }
@@ -348,29 +366,18 @@ public:
             this->finishTransmissibilities_();
         }
 
-        const auto& initconfig = eclState.getInitConfig();
-        this->tracerModel_.init(initconfig.restartRequested());
-        if (initconfig.restartRequested()) {
-            this->readEclRestartSolution_();
-        }
-        else {
-            this->readInitialCondition_();
-        }
-        this->temperatureModel_.init();
-        this->tracerModel_.prepareTracerBatches();
-
         this->updatePffDofData_();
 
         if constexpr (getPropValue<TypeTag, Properties::EnablePolymer>()) {
             const auto& vanguard = this->simulator().vanguard();
-            const auto& gridView = vanguard.gridView();
-            const int numElements = gridView.size(/*codim=*/0);
+
+            const int numElements = vanguard.gridView().size(/*codim=*/0);
             this->polymer_.maxAdsorption.resize(numElements, 0.0);
         }
 
         this->readBoundaryConditions_();
 
-        // compute and set eq weights based on initial b values
+        // Compute and set eq weights based on initial b values
         this->computeAndSetEqWeights_();
 
         if (this->enableDriftCompensation_ || this->enableDriftCompensationTemp_) {
@@ -378,10 +385,12 @@ public:
             this->drift_ = 0.0;
         }
 
-        // after finishing the initialization and writing the initial solution, we move
-        // to the first "real" episode/report step
-        // for restart the episode index and start is already set
+        // After finishing the initialization and writing the initial
+        // solution, we move to the first "real" episode/report step for
+        // restart the episode index and start is already set
         if (!initconfig.restartRequested() && !eclState.getIOConfig().initOnly()) {
+            const auto& schedule = simulator.vanguard().schedule();
+
             simulator.startNextEpisode(schedule.seconds(1));
             simulator.setEpisodeIndex(0);
             simulator.setTimeStepIndex(0);
@@ -406,7 +415,8 @@ public:
         }
 
         // Checked once the initial solution has been applied.
-        this->checkAquiferEquilibration_ = !initconfig.restartRequested() && initconfig.hasEquil();
+        this->checkAquiferEquilibration_ =
+            !initconfig.restartRequested() && initconfig.hasEquil();
 
         // TODO: move to the end for later refactoring of the function finishInit()
         //
@@ -415,11 +425,13 @@ public:
                                 this->episodeIndex(),
                                 eclState.runspec().tabdims().getNumPVTTables());
 
-        // Seed the DRSDT/DRVDT history from the initial composition.  Left at
-        // zero, the limiter caps Rs at DRSDT * dt on the first step and boils
-        // the dissolved gas out of an undersaturated reservoir.  A restarted
-        // run seeds it from the restart solution instead.
         if (!initconfig.restartRequested()) {
+            // Seed the DRSDT/DRVDT history from the initial composition.
+            // Left at zero, the limiter caps Rs at DRSDT * dt on the first
+            // step and boils the dissolved gas out of an undersaturated
+            // reservoir.  A restarted run seeds it from the restart
+            // solution instead.
+
             for (std::size_t elemIdx = 0; elemIdx < this->initialFluidStates_.size(); ++elemIdx) {
                 const auto& fs = this->initialFluidStates_[elemIdx];
                 this->mixControls_.updateLastValues(elemIdx, fs.Rs(), fs.Rv());
@@ -432,15 +444,16 @@ public:
             FlowProblemType::writeOutput(true);
         }
 
-        if (!eclState.getIOConfig().initOnly()) {
-            if (!this->enableTuning_ && eclState.getSimulationConfig().anyTUNING()) {
-                OpmLog::info("\nThe deck has TUNING in the SCHEDULE section, but "
-                             "it is ignored due\nto the flag --enable-tuning=false. "
-                             "Set this flag to true to activate it.\n"
-                             "Manually tuning the simulator with the TUNING keyword may "
-                             "increase run time.\nIt is recommended using the simulator's "
-                             "default tuning (--enable-tuning=false).");
-            }
+        if (!eclState.getIOConfig().initOnly() &&
+            !this->enableTuning_ &&
+            eclState.getSimulationConfig().anyTUNING())
+        {
+            OpmLog::info("\nThe deck has TUNING in the SCHEDULE section, but "
+                         "it is ignored due\nto the flag --enable-tuning=false. "
+                         "Set this flag to true to activate it.\n"
+                         "Manually tuning the simulator with the TUNING keyword may "
+                         "increase run time.\nIt is recommended using the simulator's "
+                         "default tuning (--enable-tuning=false).");
         }
     }
 

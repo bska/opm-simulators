@@ -75,6 +75,9 @@ public:
                         const Dune::CartesianIndexMapper<EquilGrid>* equilCartMapper,
                         const std::set<std::string>& fipRegionsInterregFlow = {});
 
+    /// Special purpose operation for INIT-style arrays.
+    void collect(const data::Solution& localCellData);
+
     // gather solution to rank 0 for EclipseWriter
     void collect(const data::Solution&                                localCellData,
                  const std::map<std::pair<std::string, int>, double>& localBlockData,

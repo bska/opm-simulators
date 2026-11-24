@@ -643,28 +643,50 @@ satFromPc(const MaterialLawManager& materialLawManager,
           const bool increasing)
 {
     using Scalar = typename FluidSystem::Scalar;
+
     // Find minimum and maximum saturations.
-    Scalar s0 = increasing ? maxSaturations<FluidSystem>(materialLawManager, phase, cell) : minSaturations<FluidSystem>(materialLawManager, phase, cell);
-    Scalar s1 = increasing ? minSaturations<FluidSystem>(materialLawManager, phase, cell) : maxSaturations<FluidSystem>(materialLawManager, phase, cell);
+    const Scalar s0 = increasing
+        ? maxSaturations<FluidSystem>(materialLawManager, phase, cell)
+        : minSaturations<FluidSystem>(materialLawManager, phase, cell);
+
+    const Scalar s1 = increasing
+        ? minSaturations<FluidSystem>(materialLawManager, phase, cell)
+        : maxSaturations<FluidSystem>(materialLawManager, phase, cell);
+
+    if (cell == 369) {
+        const auto str = fmt::format("(s0, s1) = ({}, {})", s0, s1);
+    }
 
     // Create the equation f(s) = pc(s) - targetPc
-    const PcEq<FluidSystem, MaterialLawManager> f(materialLawManager, phase, cell, targetPc);
-    Scalar f0 = f(s0);
-    Scalar f1 = f(s1);
-    if (!std::isfinite(f0 + f1))
-        throw std::logic_error(fmt::format("The capillary pressure values {} and {} are not finite", f0, f1));
+    const auto f = PcEq<FluidSystem, MaterialLawManager> {
+        materialLawManager, phase, cell, targetPc
+    };
 
-    if (f0 <= 0.0)
+    const Scalar f0 = f(s0);
+    const Scalar f1 = f(s1);
+    if (!std::isfinite(f0 + f1)) {
+        throw std::logic_error {
+            fmt::format("The capillary pressure values "
+                        "{} (s = {}) and {} (s = {}) "
+                        "are not finite", f0, s0, f1, s1)
+        };
+    }
+
+    if (f0 <= 0.0) {
         return s0;
-    else if (f1 >= 0.0)
+    }
+    else if (f1 >= 0.0) {
         return s1;
+    }
 
     const Scalar tol = 1e-10;
+
     // should at least converge in 2 times bisection but some safety here:
     const int maxIter = -2*static_cast<int>(std::log2(tol)) + 10;
     int usedIterations = -1;
-    const Scalar root = RegulaFalsiBisection<ThrowOnError>::solve(f, s0, s1, maxIter, tol, usedIterations);
-    return root;
+
+    return RegulaFalsiBisection<ThrowOnError>::
+        solve(f, s0, s1, maxIter, tol, usedIterations);
 }
 
 template<class FluidSystem, class MaterialLawManager>
